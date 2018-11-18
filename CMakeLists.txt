@@ -4,6 +4,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -g")
 
 set(LIB_SRC ${CMAKE_SOURCE_DIR}/lib)
 set(TOOLS_SRC ${CMAKE_SOURCE_DIR}/tools)
+set(ALGTEST_SRC ${CMAKE_SOURCE_DIR}/algtest)
 
 set(SOURCES
     ${LIB_SRC}/files.c
@@ -26,11 +27,12 @@ set(SOURCES
     ${LIB_SRC}/tpm2_tcti_ldr.c
     ${LIB_SRC}/tpm2_util.c
     ${LIB_SRC}/tpm_kdfa.c
+    ${TOOLS_SRC}/tpm2_tool.c
     ${TOOLS_SRC}/tpm2_algtest.c
-    ${TOOLS_SRC}/tpm2_tool.c)
+    ${ALGTEST_SRC}/utils.c
+    ${ALGTEST_SRC}/createprimary.c)
 
-include_directories(${TOOLS_SRC}
-                    ${LIB_SRC})
+include_directories(${LIB_SRC} ${TOOLS_SRC} ${ALGTEST_SRC})
 
 add_executable(tpm2_algtest ${SOURCES})
 
