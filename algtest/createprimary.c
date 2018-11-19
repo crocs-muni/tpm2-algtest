@@ -77,7 +77,7 @@ void testAndMeasure(TSS2_SYS_CONTEXT *sapi_context,
         updateHandles(objectHandle, handles, &numHandles);
 
 
-        printf("keyBits %d | %fs | handle: %08x | rc: %04x\n",
+        printf("param: %d | %fs | handle: %08x | rc: %04x\n",
                 params->inPublic.publicArea.parameters.rsaDetail.keyBits,
                 durations[i], objectHandle, rc);
     }
@@ -99,6 +99,7 @@ void testAndMeasure(TSS2_SYS_CONTEXT *sapi_context,
 void measure_CreatePrimary_RSA(TSS2_SYS_CONTEXT *sapi_context,
         struct createPrimaryParams *params)
 {
+    puts("Measuring CreatePrimary (RSA)...");
     /* Create RSA template */
     TPM2B_PUBLIC inPublic = {
         .size = 0, // doesn't need to be set
@@ -146,6 +147,132 @@ void measure_CreatePrimary_RSA(TSS2_SYS_CONTEXT *sapi_context,
     fclose(out);
     fclose(outAll);
 }
+#if 0
+
+void measure_CreatePrimary_KEYEDHASH(TSS2_SYS_CONTEXT *sapi_context)
+{
+    /* Create ECC template */
+    TPM2B_PUBLIC inPublic = {
+        .size = 0, // doesn't need to be set
+        .publicArea = {             // TPMT_PUBLIC
+            .type = TPM2_ALG_ECC,                   // TPMI_ALG_PUBLIC
+            .nameAlg = TPM2_ALG_SHA256,             // TPMI_ALG_HASH
+            .objectAttributes =                     // TPMA_OBJECT
+                TPMA_OBJECT_RESTRICTED | TPMA_OBJECT_DECRYPT
+                | TPMA_OBJECT_FIXEDTPM | TPMA_OBJECT_FIXEDPARENT
+                | TPMA_OBJECT_SENSITIVEDATAORIGIN | TPMA_OBJECT_USERWITHAUTH,
+            .authPolicy = { .size = 0, /* buffer */ }, // TPM2B_DIGEST
+            .parameters = {                 // TPMU_PUBLIC_PARMS
+
+                }
+            },
+            .unique = {                     // TPMU_PUBLIC_ID
+                .rsa = {                        // TPM2B_PUBLIC_KEY_RSA
+                    .size = 0,
+                    /* buffer */
+                }
+            }
+        }
+    };
+
+
+}
+
+void measure_CreatePrimary_SYMCIPHER(TSS2_SYS_CONTEXT *sapi_context)
+{
+    /* Create ECC template */
+    TPM2B_PUBLIC inPublic = {
+        .size = 0, // doesn't need to be set
+        .publicArea = {             // TPMT_PUBLIC
+            .type = TPM2_ALG_ECC,                   // TPMI_ALG_PUBLIC
+            .nameAlg = TPM2_ALG_SHA256,             // TPMI_ALG_HASH
+            .objectAttributes =                     // TPMA_OBJECT
+                TPMA_OBJECT_RESTRICTED | TPMA_OBJECT_DECRYPT
+                | TPMA_OBJECT_FIXEDTPM | TPMA_OBJECT_FIXEDPARENT
+                | TPMA_OBJECT_SENSITIVEDATAORIGIN | TPMA_OBJECT_USERWITHAUTH,
+            .authPolicy = { .size = 0, /* buffer */ }, // TPM2B_DIGEST
+            .parameters = {                 // TPMU_PUBLIC_PARMS
+
+                }
+            },
+            .unique = {                     // TPMU_PUBLIC_ID
+                .rsa = {                        // TPM2B_PUBLIC_KEY_RSA
+                    .size = 0,
+                    /* buffer */
+                }
+            }
+        }
+    };
+
+
+}
+#endif
+
+/*
+void findECCCurves(TSS2_SYS_CONTEXT *sapi_context, TPMI_ECC_CURVE curves[],
+        int *numCurves)
+{
+
+}
+*/
+
+void measure_CreatePrimary_ECC(TSS2_SYS_CONTEXT *sapi_context,
+        struct createPrimaryParams *params)
+{
+    puts("Measuring CreatePrimary (ECC)...");
+    /*
+    TPMI_ECC_CURVE curves[10];
+    int numCurves = 0;
+    findECCCurves(sapi_context, curves, &numCurves);
+    */
+
+    /* Create ECC template */
+    TPM2B_PUBLIC inPublic = {
+        .size = 0, // doesn't need to be set
+        .publicArea = {             // TPMT_PUBLIC
+            .type = TPM2_ALG_ECC,                   // TPMI_ALG_PUBLIC
+            .nameAlg = TPM2_ALG_SHA256,             // TPMI_ALG_HASH
+            .objectAttributes =                     // TPMA_OBJECT
+                TPMA_OBJECT_RESTRICTED | TPMA_OBJECT_DECRYPT
+                | TPMA_OBJECT_FIXEDTPM | TPMA_OBJECT_FIXEDPARENT
+                | TPMA_OBJECT_SENSITIVEDATAORIGIN | TPMA_OBJECT_USERWITHAUTH,
+            .authPolicy = { .size = 0, /* buffer */ }, // TPM2B_DIGEST
+            .parameters = {                 // TPMU_PUBLIC_PARMS
+                .eccDetail = {
+                    .symmetric = {              // TPMT_SYM_DEF_OBJECT
+                        .algorithm = TPM2_ALG_AES,  // TPMI_ALG_SYM_OBJECT
+                        .keyBits = 128,             // TPMU_SYM_KEY_BITS
+                        .mode = TPM2_ALG_NULL,        // TPMU_SYM_MODE
+                    },
+                    .scheme = TPM2_ALG_NULL,        // TPMT_RSA_SCHEME+
+                    .kdf = TPM2_ALG_NULL
+                }
+            },
+            .unique = {                     // TPMU_PUBLIC_ID
+                .rsa = {                        // TPM2B_PUBLIC_KEY_RSA
+                    .size = 0,
+                    /* buffer */
+                }
+            }
+        }
+    };
+
+    params->inPublic = inPublic;
+
+    FILE *out = openCSV("TPM2_CreatePrimary_ECC.csv",
+            "curveID;duration_mean;error_codes;handles\n", "w");
+    FILE *outAll = openCSV("TPM2_CreatePrimary_ECC_all.csv",
+            "curveID;duration;return_code;handle\n", "w");
+
+    //for (int i = 0; i < numCurves; ++i) {
+    for (TPM2_ECC_CURVE curve = 0x00; curve <= 0x0020; ++curve) {
+        params->inPublic.publicArea.parameters.eccDetail.curveID = curve;
+        testAndMeasure(sapi_context, params, out, outAll);
+    }
+
+    fclose(out);
+    fclose(outAll);
+}
 
 void measure_CreatePrimary(TSS2_SYS_CONTEXT *sapi_context)
 {
@@ -183,6 +310,8 @@ void measure_CreatePrimary(TSS2_SYS_CONTEXT *sapi_context)
     params.creationPCR.count = 0;
 
     measure_CreatePrimary_RSA(sapi_context, &params);
-    //measure_CreatePrimary_ECC(sapi_context, &params);
+    measure_CreatePrimary_ECC(sapi_context, &params);
+    //measure_CreatePrimary_SYMCIPHER(sapi_context, &params);
+    //measure_CreatePrimary_KEYEDHASH(sapi_context, &params);
 }
 
