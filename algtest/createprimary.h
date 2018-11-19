@@ -14,6 +14,6 @@ struct createPrimaryParams {
 };
 
 void measure_CreatePrimary_RSA(TSS2_SYS_CONTEXT *sapi_context,
-        struct createPrimaryParams params);
+        struct createPrimaryParams *params);
 
 void measure_CreatePrimary(TSS2_SYS_CONTEXT *sapi_context);

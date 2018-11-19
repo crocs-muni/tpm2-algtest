@@ -9,10 +9,177 @@
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <assert.h>
+
+const int numMeasurements = 10;
+const int maxNumHandles = 32;
+const int maxNumErrorCodes = 10;
+
+const int handlesStringSize = maxNumHandles * 11 + 1;
+const int errorCodesStringSize = maxNumErrorCodes * 5 + 1;
+
+void updateErrorCodes(TPM2_RC rc, TPM2_RC errorCodes[], int *numErrorCodes)
+{
+    assert(*numErrorCodes <= maxNumErrorCodes);
+    if (*numErrorCodes == maxNumErrorCodes)
+        return;
+    for (int i = 0; i < *numErrorCodes; ++i) {
+        if (errorCodes[i] == rc)
+            return;
+    }
+    errorCodes[(*numErrorCodes)++] = rc;
+}
+
+void updateHandles(TPM2_HANDLE handle, TPM2_HANDLE handles[], int *numHandles)
+{
+    assert(*numHandles <= maxNumHandles);
+    if (*numHandles == maxNumHandles)
+        return;
+    for (int i = 0; i < *numHandles; ++i) {
+        if (handles[i] == handle)
+            return;
+    }
+    handles[(*numHandles)++] = handle;
+}
+
+void fillHandlesString(char handlesString[], TPM2_HANDLE handles[],
+        int numHandles)
+{
+    handlesString[0] = '\0';
+    for (int i = 0; i < numHandles; ++i) {
+        char handleString[10];
+        snprintf(handleString, 10, "%08x", handles[i]);
+        if (i != numHandles - 1) {
+            strcat(handleString, ",");
+        }
+        strcat(handlesString, handleString);
+    }
+}
+
+void fillErrorCodesString(char errorCodesString[], TPM2_RC errorCodes[],
+        int numErrorCodes)
+{
+    errorCodesString[0] = '\0';
+    for (int i = 0; i < numErrorCodes; ++i) {
+        char errorCodeString[10];
+        snprintf(errorCodeString, 10, "%04x", errorCodes[i]);
+        if (i != numErrorCodes - 1) {
+            strcat(errorCodeString, ",");
+        }
+        strcat(errorCodesString, errorCodeString);
+    }
+}
+
+double duration_mean(double measurements[], int numMeasurements)
+{
+    double sum = 0.0;
+    for (int i = 0; i < numMeasurements; ++i) {
+        sum += measurements[i];
+    }
+    return sum / numMeasurements;
+}
+
+bool testParms(TSS2_SYS_CONTEXT *sapi_context,
+        struct createPrimaryParams *params)
+{
+    TPMT_PUBLIC_PARMS parameters = {
+        .type = params->inPublic.publicArea.type,
+        .parameters = params->inPublic.publicArea.parameters
+    };
+    TPM2_RC rc = Tss2_Sys_TestParms(sapi_context, NULL, &parameters, NULL);
+    //printf("test keybits: %d -> %04x\n", params->inPublic.publicArea.parameters.rsaDetail.keyBits, rc);
+    return rc == TPM2_RC_SUCCESS;
+}
+
+FILE *openCSV(char filename[], char header[], char mode[])
+{
+    FILE *file = fopen(filename, mode);
+    if (!file) {
+        perror(strerror(errno));
+        exit(1);
+    }
+    fwrite(header, 1, strlen(header), file);
+    return file;
+}
+
+void testAndMeasure(TSS2_SYS_CONTEXT *sapi_context,
+        struct createPrimaryParams *params, FILE *out, FILE *outAll)
+{
+    if (!testParms(sapi_context, params))
+        return;
+
+    double measurements[numMeasurements];
+
+    TPM2_HANDLE handles[maxNumHandles];
+    int numHandles = 0;
+
+    TPM2_RC errorCodes[maxNumErrorCodes];
+    int numErrorCodes = 0;
+
+    for (int i = 0; i < numMeasurements; ++i) {
+        /* Response paramters have to be cleared before each run. */
+        TPM2_HANDLE objectHandle;
+        TPM2B_PUBLIC outPublic = { .size = 0 };
+        TPM2B_CREATION_DATA creationData = { .size = 0 };
+        TPM2B_DIGEST creationHash = { .size = 0 };
+        TPMT_TK_CREATION creationTicket;
+        TPM2B_NAME name = { .size = 0 };
+        TSS2L_SYS_AUTH_RESPONSE rspAuthsArray; // sessionsDataOut
+
+        struct timespec start, end;
+        clock_gettime(CLOCK_MONOTONIC, &start);
+        TPM2_RC rc = Tss2_Sys_CreatePrimary(sapi_context,
+                params->primaryHandle, &params->cmdAuthsArray,
+                &params->inSensitive, &params->inPublic, &params->outsideInfo,
+                &params->creationPCR, &objectHandle, &outPublic,
+                &creationData, &creationHash,
+                &creationTicket, &name, &rspAuthsArray);
+        clock_gettime(CLOCK_MONOTONIC, &end);
+
+        /* Flush context to avoid running out of memory */
+        Tss2_Sys_FlushContext(sapi_context, objectHandle);
+
+        // TODO: cleanup this
+        if (rc == 0x02c4) {
+            return;
+        }
+
+        measurements[i] = get_duration_sec(&start, &end);
+        char toWrite[48];
+        snprintf(toWrite, 47, "%d,%f,%04x,%08x\n",
+                params->inPublic.publicArea.parameters.rsaDetail.keyBits,
+                measurements[i], rc, objectHandle);
+        toWrite[47] = '\0';
+        fwrite(toWrite, 1, strlen(toWrite), outAll);
+        fflush(outAll);
+
+        updateErrorCodes(rc, errorCodes, &numErrorCodes);
+        updateHandles(objectHandle, handles, &numHandles);
+
+
+        printf("keyBits %d | %fs | handle: %08x | rc: %04x\n",
+                params->inPublic.publicArea.parameters.rsaDetail.keyBits,
+                measurements[i], objectHandle, rc);
+    }
+
+    char toWrite[256];
+    char handlesString[handlesStringSize];
+    fillHandlesString(handlesString, handles, numHandles);
+    char errorCodesString[errorCodesStringSize];
+    fillErrorCodesString(errorCodesString, errorCodes, numErrorCodes);
+
+    snprintf(toWrite, 255, "%d; %f; %s; %s\n",
+            params->inPublic.publicArea.parameters.rsaDetail.keyBits,
+            duration_mean(measurements, numMeasurements),
+            errorCodesString, handlesString);
+    toWrite[255] = '\0';
+    fwrite(toWrite, 1, strlen(toWrite), out);
+}
 
 void measure_CreatePrimary_RSA(TSS2_SYS_CONTEXT *sapi_context,
-        struct createPrimaryParams params)
+        struct createPrimaryParams *params)
 {
+    /* Create RSA template */
     TPM2B_PUBLIC inPublic = {
         .size = 0, // doesn't need to be set
         .publicArea = {             // TPMT_PUBLIC
@@ -31,7 +198,7 @@ void measure_CreatePrimary_RSA(TSS2_SYS_CONTEXT *sapi_context,
                         .mode = TPM2_ALG_NULL,        // TPMU_SYM_MODE
                     },
                     .scheme = TPM2_ALG_NULL,        // TPMT_RSA_SCHEME+
-                    .keyBits = 1024,
+                    .keyBits = 0,
                     .exponent = 0
                 }
             },
@@ -44,63 +211,20 @@ void measure_CreatePrimary_RSA(TSS2_SYS_CONTEXT *sapi_context,
         }
     };
 
-    params.inPublic = inPublic;
+    params->inPublic = inPublic;
 
-    // TODO: find out which are available first and then pass them to function
-    int availableKeyBits[] = { 1024, 2048 };
-    int numAvailableKeyBits = 2;
-    int numMeasurements = 100;
+    FILE *out = openCSV("TPM2_CreatePrimary_RSA.csv",
+            "keyBits;duration_mean;error_codes;handles\n", "w");
+    FILE *outAll = openCSV("TPM2_CreatePrimary_RSA_all.csv",
+            "keyBits;duration;return_code;handle\n", "w");
 
-    char filename[40];
-    snprintf(filename, 40, "TPM2_CreatePrimary_RSA.csv");
-    FILE *out = fopen(filename, "w");
-    if (!out) {
-        perror(strerror(errno));
-        exit(1);
+    for (int keyBits = 0; keyBits < 4096; keyBits += 32) {
+        params->inPublic.publicArea.parameters.rsaDetail.keyBits = keyBits;
+        testAndMeasure(sapi_context, params, out, outAll);
     }
-    char header[] = "keyBits,retval,duration,handle\n";
-    fwrite(header, 1, strlen(header), out);
 
-    for (int i = 0; i < 2; ++i) {
-        int keyBits = availableKeyBits[i];
-        inPublic.publicArea.parameters.rsaDetail.keyBits = keyBits;
-
-
-        for (int j = 0; j < numMeasurements; ++j) {
-            /* Response paramters have to be cleared before each run. */
-            TPM2_HANDLE objectHandle;
-            TPM2B_PUBLIC outPublic = { .size = 0 };
-            TPM2B_CREATION_DATA creationData = { .size = 0 };
-            TPM2B_DIGEST creationHash = { .size = 0 };
-            TPMT_TK_CREATION creationTicket;
-            TPM2B_NAME name = { .size = 0 };
-            TSS2L_SYS_AUTH_RESPONSE rspAuthsArray; // sessionsDataOut
-
-            struct timespec start, end;
-            clock_gettime(CLOCK_MONOTONIC, &start);
-            TPM2_RC retval = Tss2_Sys_CreatePrimary(sapi_context,
-                    params.primaryHandle, &params.cmdAuthsArray,
-                    &params.inSensitive, &params.inPublic, &params.outsideInfo,
-                    &params.creationPCR, &objectHandle, &outPublic,
-                    &creationData, &creationHash,
-                    &creationTicket, &name, &rspAuthsArray);
-            clock_gettime(CLOCK_MONOTONIC, &end);
-
-            /* Flush context to avoid running out of memory */
-            Tss2_Sys_FlushContext(sapi_context, objectHandle);
-
-            double duration = get_duration_sec(&start, &end);
-            char toWrite[256];
-            snprintf(toWrite, 255, "%d,%04x,%f,%08x\n", keyBits, retval,
-                    duration, objectHandle);
-            fwrite(toWrite, 1, strlen(toWrite), out);
-            fflush(out);
-
-            printf("keyBits %d | %04x | %fs | handle: %08x\n", keyBits, retval,
-                    duration, objectHandle);
-        }
-    }
     fclose(out);
+    fclose(outAll);
 }
 
 void measure_CreatePrimary(TSS2_SYS_CONTEXT *sapi_context)
@@ -119,6 +243,7 @@ void measure_CreatePrimary(TSS2_SYS_CONTEXT *sapi_context)
         .hmac = { .size = 0, /* .buffer */ }        // TPM2B_AUTH
     };
     params.sessionData = sessionData;
+
     TSS2L_SYS_AUTH_COMMAND cmdAuthsArray = {
         .count = 1,
         .auths = { sessionData }
@@ -137,6 +262,6 @@ void measure_CreatePrimary(TSS2_SYS_CONTEXT *sapi_context)
     params.outsideInfo.size = 0;
     params.creationPCR.count = 0;
 
-    measure_CreatePrimary_RSA(sapi_context, params);
+    measure_CreatePrimary_RSA(sapi_context, &params);
 }
 
