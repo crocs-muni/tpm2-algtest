@@ -3,7 +3,7 @@
 
 #include <tss2/tss2_sys.h>
 
-struct createPrimaryParams {
+struct create_primary_params {
     TPMI_RH_HIERARCHY primaryHandle;
     TPMS_AUTH_COMMAND sessionData;
     TSS2L_SYS_AUTH_COMMAND cmdAuthsArray;
@@ -14,6 +14,6 @@ struct createPrimaryParams {
 };
 
 void measure_CreatePrimary_RSA(TSS2_SYS_CONTEXT *sapi_context,
-        struct createPrimaryParams *params);
+        struct create_primary_params *params);
 
 void measure_CreatePrimary(TSS2_SYS_CONTEXT *sapi_context);
