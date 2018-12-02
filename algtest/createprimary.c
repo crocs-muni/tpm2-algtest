@@ -1,42 +1,23 @@
-#include "createprimary.h"
 #include "util.h"
 #include "tpm2_util.h"
-
-#include <tss2/tss2_sys.h>
 
 #include <stdio.h>
 #include <time.h>
 #include <string.h>
 #include <assert.h>
 
-const int num_measurements = 100;
-
-bool test_parms(TSS2_SYS_CONTEXT *sapi_context,
-        struct create_primary_params *params)
-{
-    TPMT_PUBLIC_PARMS parameters = {
-        .type = params->inPublic.publicArea.type,
-        .parameters = params->inPublic.publicArea.parameters
-    };
-    TPM2_RC rc = Tss2_Sys_TestParms(sapi_context, NULL, &parameters, NULL);
-    return rc == TPM2_RC_SUCCESS;
-}
+const int NUM_MEASUREMENTS = 100;
 
 void test_and_measure(TSS2_SYS_CONTEXT *sapi_context, char *param_fields,
-        struct create_primary_params *params, FILE *out, FILE *out_all)
+        struct create_params *params, FILE *out, FILE *out_all)
 {
     if (!test_parms(sapi_context, params))
         return;
 
-    double durations[num_measurements];
+    struct summary summary;
+    init_summary(&summary);
 
-    TPM2_HANDLE handles[max_num_handles];
-    int num_handles = 0;
-
-    TPM2_RC error_codes[max_num_error_codes];
-    int num_error_codes = 0;
-
-    for (int i = 0; i < num_measurements; ++i) {
+    for (int i = 0; i < NUM_MEASUREMENTS; ++i) {
         /* Response paramters have to be cleared before each run. */
         TPM2_HANDLE objectHandle;
         TPM2B_PUBLIC outPublic = { .size = 0 };
@@ -46,17 +27,19 @@ void test_and_measure(TSS2_SYS_CONTEXT *sapi_context, char *param_fields,
         TPM2B_NAME name = { .size = 0 };
         TSS2L_SYS_AUTH_RESPONSE rspAuthsArray; // sessionsDataOut
 
+        TPMI_RH_HIERARCHY primaryHandle = TPM2_RH_NULL; // use NULL hierarchy for testing
+
         struct timespec start, end;
         clock_gettime(CLOCK_MONOTONIC, &start);
         TPM2_RC rc = Tss2_Sys_CreatePrimary(sapi_context,
-                params->primaryHandle, &params->cmdAuthsArray,
+                primaryHandle, &params->cmdAuthsArray,
                 &params->inSensitive, &params->inPublic, &params->outsideInfo,
                 &params->creationPCR, &objectHandle, &outPublic,
                 &creationData, &creationHash,
                 &creationTicket, &name, &rspAuthsArray);
         clock_gettime(CLOCK_MONOTONIC, &end);
 
-        /* Flush context to avoid running out of memory */
+        /* Flush context ASAP to avoid running out of memory */
         Tss2_Sys_FlushContext(sapi_context, objectHandle);
 
         // TODO: cleanup this
@@ -64,28 +47,29 @@ void test_and_measure(TSS2_SYS_CONTEXT *sapi_context, char *param_fields,
             return;
         }
 
-        durations[i] = get_duration_sec(&start, &end);
-        fprintf(out_all, "%s;%f;%04x;%08x\n", param_fields, durations[i], rc,
-                objectHandle);
-
-        update_error_codes(rc, error_codes, &num_error_codes);
-        update_handles(objectHandle, handles, &num_handles);
+        double duration = get_duration_sec(&start, &end);
 
         printf("param: %s | %fs | handle: %08x | rc: %04x\n", param_fields,
-                durations[i], objectHandle, rc);
+                duration, objectHandle, rc);
+
+        if (rc != TPM2_RC_SUCCESS) {
+            update_error_codes(rc, &summary.seen_error_codes);
+            continue;
+        }
+
+        add_measurement(duration, &summary.measurements);
+
+        fprintf(out_all, "%s;%f;%04x;%08x\n", param_fields, duration, rc,
+                objectHandle);
+
+        update_handles(objectHandle, &summary.seen_handles);
     }
 
-    char handles_string[handles_string_size];
-    fill_handles_string(handles_string, handles, num_handles);
-    char error_codes_string[error_codes_string_size];
-    fill_error_codes_string(error_codes_string, error_codes, num_error_codes);
-
-    fprintf(out, "%s; %f; %s; %s\n", param_fields,
-            mean(durations, num_measurements), error_codes_string, handles_string);
+    print_summary_to_file(out, param_fields, &summary);
 }
 
 void measure_CreatePrimary_RSA(TSS2_SYS_CONTEXT *sapi_context,
-        struct create_primary_params *params)
+        struct create_params *params)
 {
     puts("Measuring CreatePrimary (RSA)...");
 
@@ -110,7 +94,7 @@ void measure_CreatePrimary_RSA(TSS2_SYS_CONTEXT *sapi_context,
     FILE *out_all = open_csv("TPM2_CreatePrimary_RSA_all.csv",
             "keyBits;duration;return_code;handle", "w");
 
-    for (int keyBits = 0; keyBits < 4096; keyBits += 32) {
+    for (int keyBits = 0; keyBits <= TPM2_MAX_RSA_KEY_BYTES * 8; keyBits += 32) {
         params->inPublic.publicArea.parameters.rsaDetail.keyBits = keyBits;
         char param_fields[6];
         snprintf(param_fields, 6, "%d", keyBits);
@@ -122,7 +106,7 @@ void measure_CreatePrimary_RSA(TSS2_SYS_CONTEXT *sapi_context,
 }
 
 void measure_CreatePrimary_KEYEDHASH(TSS2_SYS_CONTEXT *sapi_context,
-    struct create_primary_params *params)
+    struct create_params *params)
 {
     puts("Measuring CreatePrimary (KEYEDHASH)...");
 
@@ -187,7 +171,7 @@ void measure_CreatePrimary_KEYEDHASH(TSS2_SYS_CONTEXT *sapi_context,
 }
 
 void measure_CreatePrimary_SYMCIPHER(TSS2_SYS_CONTEXT *sapi_context,
-        struct create_primary_params *params)
+        struct create_params *params)
 {
     puts("Measuring CreatePrimary (SYMCIPHER)...");
 
@@ -211,7 +195,7 @@ void measure_CreatePrimary_SYMCIPHER(TSS2_SYS_CONTEXT *sapi_context,
             algorithm < TPM2_ALG_LAST; ++algorithm) {
         params->inPublic.publicArea.parameters.symDetail.sym.algorithm
             = algorithm;
-        for (int keyBits = 0; keyBits < 512; keyBits += 32) {
+        for (int keyBits = 0; keyBits <= TPM2_MAX_SYM_KEY_BYTES * 8; keyBits += 32) {
             params->inPublic.publicArea.parameters.symDetail.sym.keyBits.sym
                 = keyBits;
             char param_fields[12];
@@ -225,7 +209,7 @@ void measure_CreatePrimary_SYMCIPHER(TSS2_SYS_CONTEXT *sapi_context,
 }
 
 void measure_CreatePrimary_ECC(TSS2_SYS_CONTEXT *sapi_context,
-        struct create_primary_params *params)
+        struct create_params *params)
 {
     puts("Measuring CreatePrimary (ECC)...");
 
@@ -263,54 +247,12 @@ void measure_CreatePrimary_ECC(TSS2_SYS_CONTEXT *sapi_context,
 void measure_CreatePrimary(TSS2_SYS_CONTEXT *sapi_context)
 {
     printf("TPM2_CreatePrimary:\n");
-    struct create_primary_params params;
+    struct create_params params;
+    prepare_common_create_params(&params);
 
-    /* Use NULL hierarchy for testing */
-    params.primaryHandle = TPM2_RH_NULL;        // TPMI_RH_HIERARCHY
-
-    /* Create password session, w/ 0-length password */
-    TPMS_AUTH_COMMAND sessionData = {
-        .sessionHandle = TPM2_RS_PW,                // TPMI_SH_AUTH_SESSION
-        .nonce = { .size = 0, /* .buffer */ },      // TPM2B_NONCE
-        .sessionAttributes = TPMA_SESSION_CONTINUESESSION, // TPMA_SESSION
-        .hmac = { .size = 0, /* .buffer */ }        // TPM2B_AUTH
-    };
-    params.sessionData = sessionData;
-
-    TSS2L_SYS_AUTH_COMMAND cmdAuthsArray = {
-        .count = 1,
-        .auths = { sessionData }
-    };
-    params.cmdAuthsArray = cmdAuthsArray;
-
-    /* No key authorization */
-    TPM2B_SENSITIVE_CREATE inSensitive = {
-        .size = 0,
-        .sensitive = {                              // TPMS_SENSITIVE_CREATE
-            .userAuth = { .size = 0, /* buffer */ },    // TPM2B_AUTH
-            .data = { .size = 0, /* buffer */ },        // TPM2B_SENSITIVE_DATA
-        }
-    };
-    params.inSensitive = inSensitive;
-    params.outsideInfo.size = 0;
-    params.creationPCR.count = 0;
-
-    TPM2B_PUBLIC inPublic = {
-        .size = 0, // doesn't need to be set
-        .publicArea = {                         // TPMT_PUBLIC
-            .nameAlg = TPM2_ALG_SHA256,             // TPMI_ALG_HASH
-            .objectAttributes =                     // TPMA_OBJECT
-                TPMA_OBJECT_RESTRICTED | TPMA_OBJECT_DECRYPT
-                | TPMA_OBJECT_FIXEDTPM | TPMA_OBJECT_FIXEDPARENT
-                | TPMA_OBJECT_SENSITIVEDATAORIGIN | TPMA_OBJECT_USERWITHAUTH,
-            .authPolicy = { .size = 0, /* buffer */ }, // TPM2B_DIGEST
-        }
-    };
-    params.inPublic = inPublic;
-
-//    measure_CreatePrimary_RSA(sapi_context, &params);
-    //measure_CreatePrimary_ECC(sapi_context, &params);
-//    measure_CreatePrimary_SYMCIPHER(sapi_context, &params);
+    measure_CreatePrimary_RSA(sapi_context, &params);
+    measure_CreatePrimary_ECC(sapi_context, &params);
+    measure_CreatePrimary_SYMCIPHER(sapi_context, &params);
     measure_CreatePrimary_KEYEDHASH(sapi_context, &params);
 }
 

@@ -1,4 +1,6 @@
 #include "createprimary.h"
+#include "create.h"
+#include "util.h"
 
 #include "tpm2_tool.h"
 #include "tpm2_session.h"
