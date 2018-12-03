@@ -17,8 +17,7 @@ void init_summary(struct summary *summary)
 double get_duration_sec(struct timespec *start, struct timespec *end)
 {
     return (end->tv_sec - start->tv_sec)
-         + (double)(end->tv_nsec - start->tv_nsec)
-         / 1000000000;
+         + (end->tv_nsec - start->tv_nsec) / 1000000000.0;
 }
 
 double mean(double values[], int num_values)
@@ -95,7 +94,8 @@ void fill_error_codes_string(char *error_codes_string, struct rc_array *error_co
 
 FILE *open_csv(char *filename, char *header, char *mode)
 {
-    FILE *file = fopen(filename, mode);
+    char path[256] = "csv/";
+    FILE *file = fopen(strncat(path, filename, 251), mode); // 256 - csv/ - nul
     if (!file) {
         perror(strerror(errno));
         exit(1);
