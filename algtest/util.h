@@ -55,4 +55,5 @@ bool test_parms(TSS2_SYS_CONTEXT *sapi_context, struct create_params *params);
 
 void print_summary_to_file(FILE *out, char *param_fields, struct summary *summary);
 
-void prepare_common_create_params(struct create_params *params);
+void prepare_create_primary_params(struct create_params *params);
+void prepare_create_params(struct create_params *params);

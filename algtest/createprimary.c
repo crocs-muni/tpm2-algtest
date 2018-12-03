@@ -6,8 +6,9 @@
 #include <string.h>
 #include <assert.h>
 
-const int NUM_MEASUREMENTS = 100;
+static const int NUM_MEASUREMENTS = 100;
 
+static
 void test_and_measure(TSS2_SYS_CONTEXT *sapi_context, char *param_fields,
         struct create_params *params, FILE *out, FILE *out_all)
 {
@@ -248,7 +249,7 @@ void measure_CreatePrimary(TSS2_SYS_CONTEXT *sapi_context)
 {
     printf("TPM2_CreatePrimary:\n");
     struct create_params params;
-    prepare_common_create_params(&params);
+    prepare_create_primary_params(&params);
 
     measure_CreatePrimary_RSA(sapi_context, &params);
     measure_CreatePrimary_ECC(sapi_context, &params);
