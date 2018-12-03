@@ -9,6 +9,7 @@
 
 #include <time.h>
 #include <string.h>
+#include <sys/stat.h>
 
 bool tpm2_tool_onstart(tpm2_options **opts)
 {
@@ -21,9 +22,14 @@ bool tpm2_tool_onstart(tpm2_options **opts)
 
 int tpm2_tool_onrun(TSS2_SYS_CONTEXT *sapi_context, tpm2_option_flags flags)
 {
+    if (stat("csv", NULL) == -1) {
+        umask(0000);
+        mkdir("csv", 0770);
+    }
+
     //test_GetCap(sapi_context);
     //measure_TestParms(sapi_context);
-    //measure_CreatePrimary(sapi_context);
+    measure_CreatePrimary(sapi_context);
     measure_Create(sapi_context);
     //measure_CreateLoaded();
     //measure_RSA_Encrypt();
