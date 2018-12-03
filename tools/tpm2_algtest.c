@@ -1,4 +1,6 @@
 #include "createprimary.h"
+#include "create.h"
+#include "util.h"
 
 #include "tpm2_tool.h"
 #include "tpm2_session.h"
@@ -21,8 +23,8 @@ int tpm2_tool_onrun(TSS2_SYS_CONTEXT *sapi_context, tpm2_option_flags flags)
 {
     //test_GetCap(sapi_context);
     //measure_TestParms(sapi_context);
-    measure_CreatePrimary(sapi_context);
-    //measure_Create(sapi_context);
+    //measure_CreatePrimary(sapi_context);
+    measure_Create(sapi_context);
     //measure_CreateLoaded();
     //measure_RSA_Encrypt();
     //measure_RSA_Decrypt();

@@ -29,8 +29,9 @@ set(SOURCES
     ${LIB_SRC}/tpm_kdfa.c
     ${TOOLS_SRC}/tpm2_tool.c
     ${TOOLS_SRC}/tpm2_algtest.c
-    ${ALGTEST_SRC}/utils.c
-    ${ALGTEST_SRC}/createprimary.c)
+    ${ALGTEST_SRC}/util.c
+    ${ALGTEST_SRC}/createprimary.c
+    ${ALGTEST_SRC}/create.c)
 
 include_directories(${LIB_SRC} ${TOOLS_SRC} ${ALGTEST_SRC})
 
