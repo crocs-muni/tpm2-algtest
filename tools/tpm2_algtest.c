@@ -22,7 +22,8 @@ bool tpm2_tool_onstart(tpm2_options **opts)
 
 int tpm2_tool_onrun(TSS2_SYS_CONTEXT *sapi_context, tpm2_option_flags flags)
 {
-    if (stat("csv", NULL) == -1) {
+    struct stat sb;
+    if (stat("csv", &sb) == -1) {
         umask(0000);
         mkdir("csv", 0770);
     }

@@ -132,6 +132,9 @@ void measure_CreatePrimary_KEYEDHASH(TSS2_SYS_CONTEXT *sapi_context,
 
         switch (scheme) {
         case TPM2_ALG_HMAC:
+            /* HMAC only signs, doesn't decrypt */
+            params->inPublic.publicArea.objectAttributes &= ~TPMA_OBJECT_DECRYPT;
+            params->inPublic.publicArea.objectAttributes |= TPMA_OBJECT_SIGN_ENCRYPT;
             for (int hashAlg = TPM2_ALG_FIRST; hashAlg <= TPM2_ALG_LAST; ++hashAlg) {
                 parameters.keyedHashDetail.scheme.details.hmac.hashAlg = hashAlg;
                 params->inPublic.publicArea.parameters = parameters;
@@ -139,6 +142,8 @@ void measure_CreatePrimary_KEYEDHASH(TSS2_SYS_CONTEXT *sapi_context,
                 snprintf(param_fields, 16, "%04x;%04x", scheme, hashAlg);
                 test_and_measure(sapi_context, param_fields, params, out, out_all);
             }
+            params->inPublic.publicArea.objectAttributes |= TPMA_OBJECT_DECRYPT;
+            params->inPublic.publicArea.objectAttributes &= ~TPMA_OBJECT_SIGN_ENCRYPT;
             break;
         case TPM2_ALG_XOR:
             for (int hashAlg = TPM2_ALG_FIRST; hashAlg <= TPM2_ALG_LAST; ++hashAlg) {
@@ -223,7 +228,7 @@ void measure_CreatePrimary_ECC(TSS2_SYS_CONTEXT *sapi_context,
                 .keyBits = 128,             // TPMU_SYM_KEY_BITS
                 .mode = TPM2_ALG_NULL,        // TPMU_SYM_MODE
             },
-            .scheme = TPM2_ALG_NULL,        // TPMT_RSA_SCHEME+
+            .scheme = TPM2_ALG_NULL,        // TPMT_ECC_SCHEME+
             .kdf = TPM2_ALG_NULL
         }
     };
