@@ -1,3 +1,4 @@
+#include "context.h"
 #include "createprimary.h"
 #include "create.h"
 #include "util.h"
@@ -9,15 +10,56 @@
 
 #include <time.h>
 #include <string.h>
+#include <stdlib.h>
 #include <sys/stat.h>
+
+struct tpm_algtest_ctx ctx = {
+    .command = "all",
+    .type = "all",
+    .algorithm = "all",
+    .repetitions = 0,
+    .keylen = 0
+};
+
+static
+bool on_option(char key, char *value)
+{
+    switch (key) {
+    case 't':
+        ctx.type = value;
+        break;
+    case 'c':
+        ctx.command = value;
+        break;
+    case 'l':
+        ctx.keylen = atoi(value);
+        break;
+    case 'n':
+        ctx.repetitions = atoi(value);
+        break;
+    case 'a':
+        ctx.algorithm = value;
+        break;
+    }
+    return true;
+}
 
 bool tpm2_tool_onstart(tpm2_options **opts)
 {
     const struct option topts[] = {
+        { "command", required_argument, NULL, 'c' },
+        { "keylen", required_argument, NULL, 'l' },
+        { "algorithm", required_argument, NULL, 'a' }
     };
-    *opts = tpm2_options_new("", ARRAY_LEN(topts), topts, NULL, NULL, 0);
+    *opts = tpm2_options_new("n:c:l:a:", ARRAY_LEN(topts), topts, on_option, NULL, 0);
 
     return *opts != NULL;
+}
+
+void run_all(TSS2_SYS_CONTEXT *sapi_context)
+{
+    test_CreatePrimary(sapi_context);
+    test_Create(sapi_context);
 }
 
 int tpm2_tool_onrun(TSS2_SYS_CONTEXT *sapi_context, tpm2_option_flags flags)
@@ -28,21 +70,16 @@ int tpm2_tool_onrun(TSS2_SYS_CONTEXT *sapi_context, tpm2_option_flags flags)
         mkdir("csv", 0770);
     }
 
-    //test_GetCap(sapi_context);
-    //measure_TestParms(sapi_context);
-    measure_CreatePrimary(sapi_context);
-    measure_Create(sapi_context);
-    //measure_CreateLoaded();
-    //measure_RSA_Encrypt();
-    //measure_RSA_Decrypt();
-    //measure_ECDH_KeyGen();
-    //measure_ECDH_ZGen();
-    //measure_ZGen_2Phase();
-    //measure_EncryptDecrypt();
-    //measure_EncryptDecrypt2();
-    //measure_Hash();
-    //measure_HMAC();
-
+    if (strcmp(ctx.command, "all") == 0) {
+        run_all(sapi_context);
+    } else if (strcmp(ctx.command, "createprimary") == 0) {
+        test_CreatePrimary(sapi_context);
+    } else if (strcmp(ctx.command, "create") == 0) {
+        test_Create(sapi_context);
+    } else {
+        fprintf(stderr, "Unknown command!\n");
+        exit(1);
+    }
     return 0;
 }
 

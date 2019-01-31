@@ -92,7 +92,7 @@ void fill_error_codes_string(char *error_codes_string, struct rc_array *error_co
     }
 }
 
-FILE *open_csv(char *filename, char *header, char *mode)
+FILE *open_csv(const char *filename, const char *header, const char *mode)
 {
     char path[256] = "csv/";
     FILE *file = fopen(strncat(path, filename, 251), mode); // 256 - csv/ - nul
@@ -102,16 +102,6 @@ FILE *open_csv(char *filename, char *header, char *mode)
     }
     fprintf(file, "%s\n", header);
     return file;
-}
-
-bool test_parms(TSS2_SYS_CONTEXT *sapi_context, struct create_params *params)
-{
-    TPMT_PUBLIC_PARMS parameters = {
-        .type = params->inPublic.publicArea.type,
-        .parameters = params->inPublic.publicArea.parameters
-    };
-    TPM2_RC rc = Tss2_Sys_TestParms(sapi_context, NULL, &parameters, NULL);
-    return rc == TPM2_RC_SUCCESS;
 }
 
 void print_summary_to_file(FILE *out, char *param_fields, struct summary *summary)
@@ -125,88 +115,3 @@ void print_summary_to_file(FILE *out, char *param_fields, struct summary *summar
             error_codes_string, handles_string);
 }
 
-void prepare_create_primary_params(struct create_params *params)
-{
-    /* Create password session, w/ 0-length password */
-    TPMS_AUTH_COMMAND sessionData = {
-        .sessionHandle = TPM2_RS_PW,                // TPMI_SH_AUTH_SESSION
-        .nonce = { .size = 0, /* .buffer */ },      // TPM2B_NONCE
-        .sessionAttributes = TPMA_SESSION_CONTINUESESSION, // TPMA_SESSION
-        .hmac = { .size = 0, /* .buffer */ }        // TPM2B_AUTH
-    };
-    params->sessionData = sessionData;
-
-    TSS2L_SYS_AUTH_COMMAND cmdAuthsArray = {
-        .count = 1,
-        .auths = { sessionData }
-    };
-    params->cmdAuthsArray = cmdAuthsArray;
-
-    /* No key authorization */
-    TPM2B_SENSITIVE_CREATE inSensitive = {
-        .size = 0,
-        .sensitive = {                              // TPMS_SENSITIVE_CREATE
-            .userAuth = { .size = 0, /* buffer */ },    // TPM2B_AUTH
-            .data = { .size = 0, /* buffer */ },        // TPM2B_SENSITIVE_DATA
-        }
-    };
-    params->inSensitive = inSensitive;
-    params->outsideInfo.size = 0;
-    params->creationPCR.count = 0;
-
-    TPM2B_PUBLIC inPublic = {
-        .size = 0, // doesn't need to be set
-        .publicArea = {                         // TPMT_PUBLIC
-            .nameAlg = TPM2_ALG_SHA256,             // TPMI_ALG_HASH
-            .objectAttributes =                     // TPMA_OBJECT
-                TPMA_OBJECT_RESTRICTED | TPMA_OBJECT_DECRYPT
-                | TPMA_OBJECT_FIXEDTPM | TPMA_OBJECT_FIXEDPARENT
-                | TPMA_OBJECT_SENSITIVEDATAORIGIN | TPMA_OBJECT_USERWITHAUTH,
-            .authPolicy = { .size = 0, /* buffer */ }, // TPM2B_DIGEST
-        }
-    };
-    params->inPublic = inPublic;
-}
-
-void prepare_create_params(struct create_params *params)
-{
-    /* Create password session, w/ 0-length password */
-    TPMS_AUTH_COMMAND sessionData = {
-        .sessionHandle = TPM2_RS_PW,                // TPMI_SH_AUTH_SESSION
-        .nonce = { .size = 0, /* .buffer */ },      // TPM2B_NONCE
-        .sessionAttributes = TPMA_SESSION_CONTINUESESSION, // TPMA_SESSION
-        .hmac = { .size = 0, /* .buffer */ }        // TPM2B_AUTH
-    };
-    params->sessionData = sessionData;
-
-    TSS2L_SYS_AUTH_COMMAND cmdAuthsArray = {
-        .count = 1,
-        .auths = { sessionData }
-    };
-    params->cmdAuthsArray = cmdAuthsArray;
-
-    /* No key authorization */
-    TPM2B_SENSITIVE_CREATE inSensitive = {
-        .size = 0,
-        .sensitive = {                              // TPMS_SENSITIVE_CREATE
-            .userAuth = { .size = 0, /* buffer */ },    // TPM2B_AUTH
-            .data = { .size = 0, /* buffer */ },        // TPM2B_SENSITIVE_DATA
-        }
-    };
-    params->inSensitive = inSensitive;
-    params->outsideInfo.size = 0;
-    params->creationPCR.count = 0;
-
-    TPM2B_PUBLIC inPublic = {
-        .size = 0, // doesn't need to be set
-        .publicArea = {                         // TPMT_PUBLIC
-            .nameAlg = TPM2_ALG_SHA256,             // TPMI_ALG_HASH
-            .objectAttributes =                     // TPMA_OBJECT
-                TPMA_OBJECT_SIGN_ENCRYPT | TPMA_OBJECT_DECRYPT
-                | TPMA_OBJECT_FIXEDTPM | TPMA_OBJECT_FIXEDPARENT
-                | TPMA_OBJECT_SENSITIVEDATAORIGIN | TPMA_OBJECT_USERWITHAUTH,
-            .authPolicy = { .size = 0, /* buffer */ }, // TPM2B_DIGEST
-        }
-    };
-    params->inPublic = inPublic;
-}
