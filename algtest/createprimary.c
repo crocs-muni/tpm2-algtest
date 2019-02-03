@@ -15,7 +15,7 @@ static
 void test_and_measure(TSS2_SYS_CONTEXT *sapi_context, char *param_fields,
         struct create_params *params, FILE *out, FILE *out_all)
 {
-    if (!test_parms(sapi_context, params))
+    if (test_parms(sapi_context, params) != TPM2_RC_SUCCESS)
         return;
 
     struct summary summary;
@@ -144,31 +144,27 @@ void create_template_for_type(struct create_params *params, TPM2_ALG_ID type)
     TPMU_PUBLIC_PARMS parameters;
     switch (type) {
     case TPM2_ALG_RSA:
-        {
-            parameters.rsaDetail = (TPMS_RSA_PARMS) {
-                .symmetric = {              // TPMT_SYM_DEF_OBJECT
-                    .algorithm = TPM2_ALG_AES,  // TPMI_ALG_SYM_OBJECT
-                    .keyBits = 128,             // TPMU_SYM_KEY_BITS
-                    .mode = TPM2_ALG_NULL,        // TPMU_SYM_MODE
-                },
-                .scheme = TPM2_ALG_NULL,        // TPMT_RSA_SCHEME+
-                .keyBits = 0,
-                .exponent = 0
-            };
-        }
+        parameters.rsaDetail = (TPMS_RSA_PARMS) {
+            .symmetric = {              // TPMT_SYM_DEF_OBJECT
+                .algorithm = TPM2_ALG_AES,  // TPMI_ALG_SYM_OBJECT
+                .keyBits = 128,             // TPMU_SYM_KEY_BITS
+                .mode = TPM2_ALG_NULL,        // TPMU_SYM_MODE
+            },
+            .scheme = TPM2_ALG_NULL,        // TPMT_RSA_SCHEME+
+            .keyBits = 0,
+            .exponent = 0
+        };
         break;
     case TPM2_ALG_ECC:
-        {
-            parameters.eccDetail = (TPMS_ECC_PARMS) {
-                .symmetric = {              // TPMT_SYM_DEF_OBJECT
-                    .algorithm = TPM2_ALG_AES,  // TPMI_ALG_SYM_OBJECT
-                    .keyBits = 128,             // TPMU_SYM_KEY_BITS
-                    .mode = TPM2_ALG_NULL,        // TPMU_SYM_MODE
-                },
-                .scheme = TPM2_ALG_NULL,        // TPMT_ECC_SCHEME+
-                .kdf = TPM2_ALG_NULL
-            };
-        }
+        parameters.eccDetail = (TPMS_ECC_PARMS) {
+            .symmetric = {              // TPMT_SYM_DEF_OBJECT
+                .algorithm = TPM2_ALG_AES,  // TPMI_ALG_SYM_OBJECT
+                .keyBits = 128,             // TPMU_SYM_KEY_BITS
+                .mode = TPM2_ALG_NULL,        // TPMU_SYM_MODE
+            },
+            .scheme = TPM2_ALG_NULL,        // TPMT_ECC_SCHEME+
+            .kdf = TPM2_ALG_NULL
+        };
         break;
     case TPM2_ALG_KEYEDHASH:
         // Depends on scheme
@@ -372,17 +368,16 @@ void test_CreatePrimary(TSS2_SYS_CONTEXT *sapi_context)
         test_CreatePrimary_detail(sapi_context, &params, TPM2_ALG_ECC);
         test_CreatePrimary_detail(sapi_context, &params, TPM2_ALG_SYMCIPHER);
         test_CreatePrimary_detail(sapi_context, &params, TPM2_ALG_KEYEDHASH);
-    } else if (!strcmp(ctx.algorithm, "rsa")) {
+    } else if (!strcmp(ctx.type, "rsa")) {
         test_CreatePrimary_detail(sapi_context, &params, TPM2_ALG_RSA);
-    } else if (!strcmp(ctx.algorithm, "ecc")) {
+    } else if (!strcmp(ctx.type, "ecc")) {
         test_CreatePrimary_detail(sapi_context, &params, TPM2_ALG_ECC);
-    } else if (!strcmp(ctx.algorithm, "symcipher")) {
+    } else if (!strcmp(ctx.type, "symcipher")) {
         test_CreatePrimary_detail(sapi_context, &params, TPM2_ALG_SYMCIPHER);
-    } else if (!strcmp(ctx.algorithm, "keyedhash")) {
+    } else if (!strcmp(ctx.type, "keyedhash")) {
         test_CreatePrimary_detail(sapi_context, &params, TPM2_ALG_KEYEDHASH);
     } else {
         fprintf(stderr, "Unknown algorithm!\n");
-        exit(1);
     }
 }
 
