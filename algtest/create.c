@@ -7,7 +7,7 @@
 
 extern struct tpm_algtest_ctx ctx;
 
-TPMI_DH_OBJECT create_parent(TSS2_SYS_CONTEXT *sapi_context,
+TPMI_DH_OBJECT create_RSA_parent(TSS2_SYS_CONTEXT *sapi_context,
         TPMI_DH_OBJECT *parentHandle)
 {
     struct create_params params;
@@ -43,8 +43,9 @@ TPMI_DH_OBJECT create_parent(TSS2_SYS_CONTEXT *sapi_context,
     };
     params.inPublic.publicArea.parameters = parameters;
 
-    if (!test_parms(sapi_context, &params)) {
-        fprintf(stderr, "Error: AES128 not available, cannot create parent object! (TPM2_Create)\n");
+    TPM2_RC rc = test_parms(sapi_context, &params);
+    if (rc != TPM2_RC_SUCCESS) {
+        fprintf(stderr, "TPM2_Create: cannot create parent object! (%04x)\n", rc);
     }
 
     TPM2_HANDLE objectHandle;
@@ -57,7 +58,7 @@ TPMI_DH_OBJECT create_parent(TSS2_SYS_CONTEXT *sapi_context,
 
     TPMI_RH_HIERARCHY primaryHandle = TPM2_RH_NULL;
 
-    TPM2_RC rc = Tss2_Sys_CreatePrimary(sapi_context,
+    rc = Tss2_Sys_CreatePrimary(sapi_context,
             primaryHandle, &params.cmdAuthsArray,
             &params.inSensitive, &params.inPublic, &params.outsideInfo,
             &params.creationPCR, &objectHandle, &outPublic,
@@ -111,14 +112,13 @@ void prepare_create_params(struct create_params *params)
     params->inPublic = inPublic;
 }
 
-bool test_parms(TSS2_SYS_CONTEXT *sapi_context, struct create_params *params)
+TPM2_RC test_parms(TSS2_SYS_CONTEXT *sapi_context, struct create_params *params)
 {
     TPMT_PUBLIC_PARMS parameters = {
         .type = params->inPublic.publicArea.type,
         .parameters = params->inPublic.publicArea.parameters
     };
-    TPM2_RC rc = Tss2_Sys_TestParms(sapi_context, NULL, &parameters, NULL);
-    return rc == TPM2_RC_SUCCESS;
+    return Tss2_Sys_TestParms(sapi_context, NULL, &parameters, NULL);
 }
 
 static
@@ -126,24 +126,21 @@ void test_and_measure(TSS2_SYS_CONTEXT *sapi_context, char *param_fields,
         struct create_params *params, TPMI_DH_OBJECT parentHandle,
         FILE *out, FILE *out_all)
 {
-    if (!test_parms(sapi_context, params))
+    if (test_parms(sapi_context, params) != TPM2_RC_SUCCESS)
         return;
 
     struct summary summary;
     init_summary(&summary);
 
     unsigned repetitions = ctx.repetitions ? ctx.repetitions : 100;
-    for (int i = 0; i < repetitions; ++i) {
+    for (unsigned i = 0; i < repetitions; ++i) {
         /* Response paramters have to be cleared before each run. */
         TPM2B_PRIVATE outPrivate = { .size = 0 };
         TPM2B_PUBLIC outPublic = { .size = 0 };
         TPM2B_CREATION_DATA creationData = { .size = 0 };
         TPM2B_DIGEST creationHash = { .size = 0 };
         TPMT_TK_CREATION creationTicket;
-        TPM2B_NAME name = { .size = 0 };
         TSS2L_SYS_AUTH_RESPONSE rspAuthsArray; // sessionsDataOut
-
-        TPMI_RH_HIERARCHY primaryHandle = TPM2_RH_NULL; // use NULL hierarchy for testing
 
         struct timespec start, end;
         clock_gettime(CLOCK_MONOTONIC, &start);
@@ -384,13 +381,14 @@ void test_KEYEDHASH(TSS2_SYS_CONTEXT *sapi_context, struct create_params *params
             }
             break;
         default:
-            fprintf(stderr, "CreatePrimary: unknown keyedhash scheme");
+            fprintf(stderr, "CreateLoaded: unknown keyedhash scheme");
         }
     }
 }
 
 void test_Create_detail(TSS2_SYS_CONTEXT *sapi_context,
-        struct create_params *params, TPMI_DH_OBJECT parentHandle, TPM2_ALG_ID type)
+        struct create_params *params, TPMI_DH_OBJECT parentHandle,
+        TPM2_ALG_ID type)
 {
     log_testing(type);
     create_template_for_type(params, type);
@@ -419,32 +417,31 @@ void test_Create(TSS2_SYS_CONTEXT *sapi_context)
 {
     printf("TPM2_Create:\n");
     TPMI_DH_OBJECT parentHandle;
-    TPM2_RC rc = create_parent(sapi_context, &parentHandle);
+    TPM2_RC rc = create_RSA_parent(sapi_context, &parentHandle);
     if (rc != TPM2_RC_SUCCESS) {
-        fprintf(stderr, "Error: Couldn't create parent object! (TPM2_Create): %04x\n", rc);
+        fprintf(stderr, "TPM2_Create: Cannot create RSA parent! (%04x)\n", rc);
         return;
     }
-    printf("Created parent with handle %08x\n", parentHandle);
+    printf("Created RSA parent with handle %08x\n", parentHandle);
 
     struct create_params params;
     prepare_create_params(&params);
 
-    if (!strcmp(ctx.algorithm, "all")) {
+    if (!strcmp(ctx.type, "all")) {
         test_Create_detail(sapi_context, &params, parentHandle, TPM2_ALG_RSA);
         test_Create_detail(sapi_context, &params, parentHandle, TPM2_ALG_ECC);
         test_Create_detail(sapi_context, &params, parentHandle, TPM2_ALG_SYMCIPHER);
         test_Create_detail(sapi_context, &params, parentHandle, TPM2_ALG_KEYEDHASH);
-    } else if (!strcmp(ctx.algorithm, "rsa")) {
+    } else if (!strcmp(ctx.type, "rsa")) {
         test_Create_detail(sapi_context, &params, parentHandle, TPM2_ALG_RSA);
-    } else if (!strcmp(ctx.algorithm, "ecc")) {
+    } else if (!strcmp(ctx.type, "ecc")) {
         test_Create_detail(sapi_context, &params, parentHandle, TPM2_ALG_ECC);
-    } else if (!strcmp(ctx.algorithm, "symcipher")) {
+    } else if (!strcmp(ctx.type, "symcipher")) {
         test_Create_detail(sapi_context, &params, parentHandle, TPM2_ALG_SYMCIPHER);
-    } else if (!strcmp(ctx.algorithm, "keyedhash")) {
+    } else if (!strcmp(ctx.type, "keyedhash")) {
         test_Create_detail(sapi_context, &params, parentHandle, TPM2_ALG_KEYEDHASH);
     } else {
         fprintf(stderr, "Unknown algorithm!\n");
-        exit(1);
     }
 
     Tss2_Sys_FlushContext(sapi_context, parentHandle);

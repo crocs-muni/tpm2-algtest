@@ -31,7 +31,9 @@ set(SOURCES
     ${TOOLS_SRC}/tpm2_algtest.c
     ${ALGTEST_SRC}/util.c
     ${ALGTEST_SRC}/createprimary.c
-    ${ALGTEST_SRC}/create.c)
+    ${ALGTEST_SRC}/create.c
+    ${ALGTEST_SRC}/createloaded.c
+    ${ALGTEST_SRC}/ecdh_keygen.c)
 
 include_directories(${LIB_SRC} ${TOOLS_SRC} ${ALGTEST_SRC})
 
