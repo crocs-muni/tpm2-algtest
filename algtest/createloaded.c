@@ -1,115 +1,12 @@
-#include "context.h"
-#include "createprimary.h"
+#include "createloaded.h"
+#include "create.h"
 #include "util.h"
+#include "context.h"
 
-#include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 extern struct tpm_algtest_ctx ctx;
-
-TPM2_RC create_RSA_parent(TSS2_SYS_CONTEXT *sapi_context,
-        TPMI_DH_OBJECT *parentHandle)
-{
-    struct create_params params;
-    TPMA_OBJECT objectAttributes =
-        TPMA_OBJECT_RESTRICTED | TPMA_OBJECT_DECRYPT
-        | TPMA_OBJECT_FIXEDTPM | TPMA_OBJECT_FIXEDPARENT
-        | TPMA_OBJECT_SENSITIVEDATAORIGIN | TPMA_OBJECT_USERWITHAUTH;
-    prepare_create_primary_params(&params, objectAttributes);
-
-    /* Create RSA template */
-    params.inPublic.publicArea.type = TPM2_ALG_RSA;
-    TPMU_PUBLIC_PARMS parameters = {
-        .rsaDetail = {          // TPMS_RSA_PARMS
-            .symmetric = {              // TPMT_SYM_DEF_OBJECT
-                .algorithm = TPM2_ALG_AES,  // TPMI_ALG_SYM_OBJECT
-                .keyBits = 128,             // TPMU_SYM_KEY_BITS
-                .mode = TPM2_ALG_NULL,        // TPMU_SYM_MODE
-            },
-            .scheme = TPM2_ALG_NULL,        // TPMT_RSA_SCHEME+
-            .keyBits = 1024,
-            .exponent = 0
-        }
-    };
-    params.inPublic.publicArea.parameters = parameters;
-
-    TPM2_RC rc = test_parms(sapi_context, &params);
-    if (rc != TPM2_RC_SUCCESS) {
-        fprintf(stderr, "TPM2_Create: cannot create parent object! (%04x)\n", rc);
-    }
-
-    TPM2_HANDLE objectHandle;
-    TPM2B_PUBLIC outPublic = { .size = 0 };
-    TPM2B_CREATION_DATA creationData = { .size = 0 };
-    TPM2B_DIGEST creationHash = { .size = 0 };
-    TPMT_TK_CREATION creationTicket;
-    TPM2B_NAME name = { .size = 0 };
-    TSS2L_SYS_AUTH_RESPONSE rspAuthsArray; // sessionsDataOut
-
-    TPMI_RH_HIERARCHY primaryHandle = TPM2_RH_NULL;
-
-    rc = Tss2_Sys_CreatePrimary(sapi_context,
-            primaryHandle, &params.cmdAuthsArray,
-            &params.inSensitive, &params.inPublic, &params.outsideInfo,
-            &params.creationPCR, &objectHandle, &outPublic,
-            &creationData, &creationHash,
-            &creationTicket, &name, &rspAuthsArray);
-
-    *parentHandle = objectHandle;
-    return rc;
-}
-
-void prepare_create_params(struct create_params *params)
-{
-    /* Create password session, w/ 0-length password */
-    TPMS_AUTH_COMMAND sessionData = {
-        .sessionHandle = TPM2_RS_PW,                // TPMI_SH_AUTH_SESSION
-        .nonce = { .size = 0, /* .buffer */ },      // TPM2B_NONCE
-        .sessionAttributes = TPMA_SESSION_CONTINUESESSION, // TPMA_SESSION
-        .hmac = { .size = 0, /* .buffer */ }        // TPM2B_AUTH
-    };
-    params->sessionData = sessionData;
-
-    TSS2L_SYS_AUTH_COMMAND cmdAuthsArray = {
-        .count = 1,
-        .auths = { sessionData }
-    };
-    params->cmdAuthsArray = cmdAuthsArray;
-
-    /* No key authorization */
-    TPM2B_SENSITIVE_CREATE inSensitive = {
-        .size = 0,
-        .sensitive = {                              // TPMS_SENSITIVE_CREATE
-            .userAuth = { .size = 0, /* buffer */ },    // TPM2B_AUTH
-            .data = { .size = 0, /* buffer */ },        // TPM2B_SENSITIVE_DATA
-        }
-    };
-    params->inSensitive = inSensitive;
-    params->outsideInfo.size = 0;
-    params->creationPCR.count = 0;
-
-    TPM2B_PUBLIC inPublic = {
-        .size = sizeof(TPMI_ALG_HASH) + sizeof(TPMA_OBJECT) + 2,//0, // doesn't need to be set
-        .publicArea = {                         // TPMT_PUBLIC
-            .nameAlg = TPM2_ALG_SHA256,             // TPMI_ALG_HASH
-            .objectAttributes =                     // TPMA_OBJECT
-                TPMA_OBJECT_SIGN_ENCRYPT | TPMA_OBJECT_DECRYPT
-                | TPMA_OBJECT_FIXEDTPM | TPMA_OBJECT_FIXEDPARENT
-                | TPMA_OBJECT_SENSITIVEDATAORIGIN | TPMA_OBJECT_USERWITHAUTH,
-            .authPolicy = { .size = 0, /* buffer */ }, // TPM2B_DIGEST
-        }
-    };
-    params->inPublic = inPublic;
-}
-
-TPM2_RC test_parms(TSS2_SYS_CONTEXT *sapi_context, struct create_params *params)
-{
-    TPMT_PUBLIC_PARMS parameters = {
-        .type = params->inPublic.publicArea.type,
-        .parameters = params->inPublic.publicArea.parameters
-    };
-    return Tss2_Sys_TestParms(sapi_context, NULL, &parameters, NULL);
-}
 
 static
 void test_and_measure(TSS2_SYS_CONTEXT *sapi_context, char *param_fields,
@@ -122,24 +19,26 @@ void test_and_measure(TSS2_SYS_CONTEXT *sapi_context, char *param_fields,
     struct summary summary;
     init_summary(&summary);
 
+    TPM2B_TEMPLATE inPublic = {
+        .size = params->inPublic.size
+    };
+    memcpy(&inPublic.buffer, &params->inPublic.publicArea, params->inPublic.size);
     unsigned repetitions = ctx.repetitions ? ctx.repetitions : 100;
-    for (unsigned i = 0; i < repetitions; ++i) {
+    for (int i = 0; i < repetitions; ++i) {
         /* Response paramters have to be cleared before each run. */
+        TPM2_HANDLE objectHandle;
         TPM2B_PRIVATE outPrivate = { .size = 0 };
         TPM2B_PUBLIC outPublic = { .size = 0 };
-        TPM2B_CREATION_DATA creationData = { .size = 0 };
-        TPM2B_DIGEST creationHash = { .size = 0 };
-        TPMT_TK_CREATION creationTicket;
+        TPM2B_NAME name = { .size = 0 };
         TSS2L_SYS_AUTH_RESPONSE rspAuthsArray; // sessionsDataOut
 
         struct timespec start, end;
         clock_gettime(CLOCK_MONOTONIC, &start);
-        TPM2_RC rc = Tss2_Sys_Create(sapi_context,
+        TPM2_RC rc = Tss2_Sys_CreateLoaded(sapi_context,
                 parentHandle, &params->cmdAuthsArray,
-                &params->inSensitive, &params->inPublic, &params->outsideInfo,
-                &params->creationPCR, &outPrivate, &outPublic,
-                &creationData, &creationHash,
-                &creationTicket, &rspAuthsArray);
+                &params->inSensitive, &inPublic,
+                &objectHandle, &outPrivate, &outPublic,
+                &name, &rspAuthsArray);
         clock_gettime(CLOCK_MONOTONIC, &end);
 
         // TODO: cleanup this
@@ -164,7 +63,7 @@ void test_and_measure(TSS2_SYS_CONTEXT *sapi_context, char *param_fields,
 static
 void log_testing(TPM2_ALG_ID type)
 {
-    printf("Testing Create ");
+    printf("Testing CreateLoaded ");
     switch (type) {
     case TPM2_ALG_RSA:
         printf("(RSA)...\n");
@@ -185,6 +84,7 @@ static
 void create_template_for_type(struct create_params *params, TPM2_ALG_ID type)
 {
     params->inPublic.publicArea.type = type;
+    params->inPublic.size += sizeof(TPMI_ALG_PUBLIC);
     TPMU_PUBLIC_PARMS parameters;
     switch (type) {
     case TPM2_ALG_RSA:
@@ -194,6 +94,7 @@ void create_template_for_type(struct create_params *params, TPM2_ALG_ID type)
             .keyBits = 0,
             .exponent = 0
         };
+        params->inPublic.size += sizeof(TPMS_RSA_PARMS) + 2;
         break;
     case TPM2_ALG_ECC:
         parameters.eccDetail = (TPMS_ECC_PARMS) {
@@ -201,6 +102,7 @@ void create_template_for_type(struct create_params *params, TPM2_ALG_ID type)
             .scheme = TPM2_ALG_NULL,
             .kdf = TPM2_ALG_NULL
         };
+        params->inPublic.size += sizeof(TPMS_ECC_PARMS) + 4;
         break;
     case TPM2_ALG_KEYEDHASH:
         // Depends on scheme
@@ -221,19 +123,19 @@ FILE *open_csv_summary(TPM2_ALG_ID type)
     const char *header;
     switch (type) {
     case TPM2_ALG_RSA:
-        filename = "TPM2_Create_RSA.csv";
+        filename = "TPM2_CreateLoaded_RSA.csv";
         header = "keyBits;duration_mean;error_codes";
         break;
     case TPM2_ALG_ECC:
-        filename = "TPM2_Create_ECC.csv";
+        filename = "TPM2_CreateLoaded_ECC.csv";
         header = "curveId;duration_mean;error_codes";
         break;
     case TPM2_ALG_KEYEDHASH:
-        filename = "TPM2_Create_KEYEDHASH.csv";
+        filename = "TPM2_CreateLoaded_KEYEDHASH.csv";
         header = "scheme;details;duration_mean;error_codes";
         break;
     case TPM2_ALG_SYMCIPHER:
-        filename = "TPM2_Create_SYMCIPHER.csv";
+        filename = "TPM2_CreateLoaded_SYMCIPHER.csv";
         header = "algorithm;keyBits;duration_mean;error_codes";
         break;
     }
@@ -247,19 +149,19 @@ FILE *open_csv_all(TPM2_ALG_ID type)
     const char *header;
     switch (type) {
     case TPM2_ALG_RSA:
-        filename = "TPM2_Create_RSA_all.csv";
+        filename = "TPM2_CreateLoaded_RSA_all.csv";
         header = "keyBits;duration;return_code";
         break;
     case TPM2_ALG_ECC:
-        filename = "TPM2_Create_ECC_all.csv";
+        filename = "TPM2_CreateLoaded_ECC_all.csv";
         header = "curveId;duration;return_code";
         break;
     case TPM2_ALG_KEYEDHASH:
-        filename = "TPM2_Create_KEYEDHASH_all.csv";
+        filename = "TPM2_CreateLoaded_KEYEDHASH_all.csv";
         header = "scheme;details;duration;return_code";
         break;
     case TPM2_ALG_SYMCIPHER:
-        filename = "TPM2_Create_SYMCIPHER_all.csv";
+        filename = "TPM2_CreateLoaded_SYMCIPHER_all.csv";
         header = "algorithm;keyBits;duration;return_code";
         break;
     }
@@ -371,14 +273,13 @@ void test_KEYEDHASH(TSS2_SYS_CONTEXT *sapi_context, struct create_params *params
             }
             break;
         default:
-            fprintf(stderr, "Create: unknown keyedhash scheme");
+            fprintf(stderr, "CreateLoaded: unknown keyedhash scheme");
         }
     }
 }
 
-void test_Create_detail(TSS2_SYS_CONTEXT *sapi_context,
-        struct create_params *params, TPMI_DH_OBJECT parentHandle,
-        TPM2_ALG_ID type)
+void test_CreateLoaded_detail(TSS2_SYS_CONTEXT *sapi_context,
+        struct create_params *params, TPMI_DH_OBJECT parentHandle, TPM2_ALG_ID type)
 {
     log_testing(type);
     create_template_for_type(params, type);
@@ -403,33 +304,33 @@ void test_Create_detail(TSS2_SYS_CONTEXT *sapi_context,
     fclose(out_all);
 }
 
-void test_Create(TSS2_SYS_CONTEXT *sapi_context)
+void test_CreateLoaded(TSS2_SYS_CONTEXT *sapi_context)
 {
-    printf("TPM2_Create:\n");
+    printf("TPM2_CreateLoaded:\n");
     TPMI_DH_OBJECT parentHandle;
     TPM2_RC rc = create_RSA_parent(sapi_context, &parentHandle);
     if (rc != TPM2_RC_SUCCESS) {
-        fprintf(stderr, "TPM2_Create: Cannot create RSA parent! (%04x)\n", rc);
+        fprintf(stderr, "TPM2_CreateLoaded: Cannot create RSA parent! (%04x)\n", rc);
         return;
     }
-    printf("Created RSA parent with handle %08x\n", parentHandle);
+    printf("Created parent with handle %08x\n", parentHandle);
 
     struct create_params params;
     prepare_create_params(&params);
 
-    if (!strcmp(ctx.type, "all")) {
-        test_Create_detail(sapi_context, &params, parentHandle, TPM2_ALG_RSA);
-        test_Create_detail(sapi_context, &params, parentHandle, TPM2_ALG_ECC);
-        test_Create_detail(sapi_context, &params, parentHandle, TPM2_ALG_SYMCIPHER);
-        test_Create_detail(sapi_context, &params, parentHandle, TPM2_ALG_KEYEDHASH);
-    } else if (!strcmp(ctx.type, "rsa")) {
-        test_Create_detail(sapi_context, &params, parentHandle, TPM2_ALG_RSA);
-    } else if (!strcmp(ctx.type, "ecc")) {
-        test_Create_detail(sapi_context, &params, parentHandle, TPM2_ALG_ECC);
-    } else if (!strcmp(ctx.type, "symcipher")) {
-        test_Create_detail(sapi_context, &params, parentHandle, TPM2_ALG_SYMCIPHER);
-    } else if (!strcmp(ctx.type, "keyedhash")) {
-        test_Create_detail(sapi_context, &params, parentHandle, TPM2_ALG_KEYEDHASH);
+    if (!strcmp(ctx.algorithm, "all")) {
+        test_CreateLoaded_detail(sapi_context, &params, parentHandle, TPM2_ALG_RSA);
+        test_CreateLoaded_detail(sapi_context, &params, parentHandle, TPM2_ALG_ECC);
+        test_CreateLoaded_detail(sapi_context, &params, parentHandle, TPM2_ALG_SYMCIPHER);
+        test_CreateLoaded_detail(sapi_context, &params, parentHandle, TPM2_ALG_KEYEDHASH);
+    } else if (!strcmp(ctx.algorithm, "rsa")) {
+        test_CreateLoaded_detail(sapi_context, &params, parentHandle, TPM2_ALG_RSA);
+    } else if (!strcmp(ctx.algorithm, "ecc")) {
+        test_CreateLoaded_detail(sapi_context, &params, parentHandle, TPM2_ALG_ECC);
+    } else if (!strcmp(ctx.algorithm, "symcipher")) {
+        test_CreateLoaded_detail(sapi_context, &params, parentHandle, TPM2_ALG_SYMCIPHER);
+    } else if (!strcmp(ctx.algorithm, "keyedhash")) {
+        test_CreateLoaded_detail(sapi_context, &params, parentHandle, TPM2_ALG_KEYEDHASH);
     } else {
         fprintf(stderr, "Unknown algorithm!\n");
     }
