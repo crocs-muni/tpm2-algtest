@@ -22,7 +22,7 @@ void test_and_measure(TSS2_SYS_CONTEXT *sapi_context, char *param_fields,
     init_summary(&summary);
 
     unsigned repetitions = ctx.repetitions ? ctx.repetitions : 100;
-    for (int i = 0; i < repetitions; ++i) {
+    for (unsigned i = 0; i < repetitions; ++i) {
         /* Response paramters have to be cleared before each run. */
         TPM2_HANDLE objectHandle;
         TPM2B_PUBLIC outPublic = { .size = 0 };
@@ -74,7 +74,8 @@ void test_and_measure(TSS2_SYS_CONTEXT *sapi_context, char *param_fields,
     print_summary_to_file(out, param_fields, &summary);
 }
 
-void prepare_create_primary_params(struct create_params *params)
+void prepare_create_primary_params(struct create_params *params,
+        TPMA_OBJECT objectAttributes)
 {
     /* Create password session, w/ 0-length password */
     TPMS_AUTH_COMMAND sessionData = {
@@ -107,10 +108,7 @@ void prepare_create_primary_params(struct create_params *params)
         .size = 0, // doesn't need to be set
         .publicArea = {                         // TPMT_PUBLIC
             .nameAlg = TPM2_ALG_SHA256,             // TPMI_ALG_HASH
-            .objectAttributes =                     // TPMA_OBJECT
-                TPMA_OBJECT_RESTRICTED | TPMA_OBJECT_DECRYPT
-                | TPMA_OBJECT_FIXEDTPM | TPMA_OBJECT_FIXEDPARENT
-                | TPMA_OBJECT_SENSITIVEDATAORIGIN | TPMA_OBJECT_USERWITHAUTH,
+            .objectAttributes = objectAttributes,
             .authPolicy = { .size = 0, /* buffer */ }, // TPM2B_DIGEST
         }
     };
@@ -361,7 +359,11 @@ void test_CreatePrimary(TSS2_SYS_CONTEXT *sapi_context)
 {
     printf("TPM2_CreatePrimary:\n");
     struct create_params params;
-    prepare_create_primary_params(&params);
+    TPMA_OBJECT objectAttributes =
+        TPMA_OBJECT_RESTRICTED | TPMA_OBJECT_DECRYPT
+        | TPMA_OBJECT_FIXEDTPM | TPMA_OBJECT_FIXEDPARENT
+        | TPMA_OBJECT_SENSITIVEDATAORIGIN | TPMA_OBJECT_USERWITHAUTH;
+    prepare_create_primary_params(&params, objectAttributes);
 
     if (!strcmp(ctx.type, "all")) {
         test_CreatePrimary_detail(sapi_context, &params, TPM2_ALG_RSA);

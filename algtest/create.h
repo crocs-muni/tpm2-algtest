@@ -10,7 +10,7 @@ struct create_params {
     TPML_PCR_SELECTION creationPCR;
 };
 
-TPMI_DH_OBJECT create_RSA_parent(TSS2_SYS_CONTEXT *sapi_context,
+TPM2_RC create_RSA_parent(TSS2_SYS_CONTEXT *sapi_context,
         TPMI_DH_OBJECT *parentHandle);
 
 void prepare_create_params(struct create_params *params);

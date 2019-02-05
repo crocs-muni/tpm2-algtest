@@ -39,7 +39,6 @@ void test_and_measure(TSS2_SYS_CONTEXT *sapi_context, TPM2_ECC_CURVE curve,
         TPM2_RC rc = Tss2_Sys_ECDH_KeyGen(sapi_context,
                 parentHandle, NULL,
                 &zPoint, &pubPoint, &rspAuthsArray);
-
         clock_gettime(CLOCK_MONOTONIC, &end);
 
         // TODO: cleanup this
@@ -127,7 +126,6 @@ void test_ECDH_KeyGen_detail(TSS2_SYS_CONTEXT *sapi_context,
         .kdf = TPM2_ALG_NULL
     };
 
-    // TODO: try with different curves
     for (int curve = 0x00; curve <= 0x20; ++curve) {
         params.inPublic.publicArea.parameters.eccDetail.curveID = curve;
         params.inPublic.publicArea.objectAttributes &= ~TPMA_OBJECT_DECRYPT;
