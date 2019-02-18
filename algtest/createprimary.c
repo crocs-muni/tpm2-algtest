@@ -1,7 +1,9 @@
 #include "createprimary.h"
-#include "context.h"
+#include "options.h"
 #include "util.h"
 #include "tpm2_util.h"
+#include "create_util.h"
+#include "create.h"
 
 #include <stdio.h>
 #include <time.h>
@@ -9,19 +11,19 @@
 #include <stdlib.h>
 #include <assert.h>
 
-extern struct tpm_algtest_ctx ctx;
+extern struct tpm_algtest_options options;
 
 static
 void test_and_measure(TSS2_SYS_CONTEXT *sapi_context, char *param_fields,
         struct create_params *params, FILE *out, FILE *out_all)
 {
-    if (test_parms(sapi_context, params) != TPM2_RC_SUCCESS)
+    if (test_parms(sapi_context, &params->inPublic.publicArea) != TPM2_RC_SUCCESS)
         return;
 
     struct summary summary;
     init_summary(&summary);
 
-    unsigned repetitions = ctx.repetitions ? ctx.repetitions : 100;
+    unsigned repetitions = options.repetitions ? options.repetitions : 100;
     for (unsigned i = 0; i < repetitions; ++i) {
         /* Response paramters have to be cleared before each run. */
         TPM2_HANDLE objectHandle;
@@ -53,7 +55,7 @@ void test_and_measure(TSS2_SYS_CONTEXT *sapi_context, char *param_fields,
             return;
         }
 
-        double duration = get_duration_sec(&start, &end);
+        double duration = get_duration_s(&start, &end);
 
         printf("param: %s | %fs | handle: %08x | rc: %04x\n", param_fields,
                 duration, objectHandle, rc);
@@ -72,47 +74,6 @@ void test_and_measure(TSS2_SYS_CONTEXT *sapi_context, char *param_fields,
     }
 
     print_summary_to_file(out, param_fields, &summary);
-}
-
-void prepare_create_primary_params(struct create_params *params,
-        TPMA_OBJECT objectAttributes)
-{
-    /* Create password session, w/ 0-length password */
-    TPMS_AUTH_COMMAND sessionData = {
-        .sessionHandle = TPM2_RS_PW,                // TPMI_SH_AUTH_SESSION
-        .nonce = { .size = 0, /* .buffer */ },      // TPM2B_NONCE
-        .sessionAttributes = TPMA_SESSION_CONTINUESESSION, // TPMA_SESSION
-        .hmac = { .size = 0, /* .buffer */ }        // TPM2B_AUTH
-    };
-    params->sessionData = sessionData;
-
-    TSS2L_SYS_AUTH_COMMAND cmdAuthsArray = {
-        .count = 1,
-        .auths = { sessionData }
-    };
-    params->cmdAuthsArray = cmdAuthsArray;
-
-    /* No key authorization */
-    TPM2B_SENSITIVE_CREATE inSensitive = {
-        .size = 0,
-        .sensitive = {                              // TPMS_SENSITIVE_CREATE
-            .userAuth = { .size = 0, /* buffer */ },    // TPM2B_AUTH
-            .data = { .size = 0, /* buffer */ },        // TPM2B_SENSITIVE_DATA
-        }
-    };
-    params->inSensitive = inSensitive;
-    params->outsideInfo.size = 0;
-    params->creationPCR.count = 0;
-
-    TPM2B_PUBLIC inPublic = {
-        .size = 0, // doesn't need to be set
-        .publicArea = {                         // TPMT_PUBLIC
-            .nameAlg = TPM2_ALG_SHA256,             // TPMI_ALG_HASH
-            .objectAttributes = objectAttributes,
-            .authPolicy = { .size = 0, /* buffer */ }, // TPM2B_DIGEST
-        }
-    };
-    params->inPublic = inPublic;
 }
 
 static
@@ -199,7 +160,7 @@ FILE *open_csv_summary(TPM2_ALG_ID type)
         header = "algorithm;keyBits;duration_mean;error_codes;handles";
         break;
     }
-    return open_csv(filename, header, "w");
+    return open_csv(filename, header);
 }
 
 static
@@ -225,15 +186,15 @@ FILE *open_csv_all(TPM2_ALG_ID type)
         header = "algorithm;keyBits;duration;return_code;handle";
         break;
     }
-    return open_csv(filename, header, "w");
+    return open_csv(filename, header);
 }
 
 static
 void test_RSA(TSS2_SYS_CONTEXT *sapi_context, struct create_params *params,
         FILE* out, FILE* out_all)
 {
-    const int minKeyBits = ctx.keylen ? ctx.keylen : 0;
-    const int maxKeyBits = ctx.keylen ? ctx.keylen : TPM2_MAX_RSA_KEY_BYTES * 8;
+    const int minKeyBits = options.keylen ? options.keylen : 0;
+    const int maxKeyBits = options.keylen ? options.keylen : TPM2_MAX_RSA_KEY_BYTES * 8;
     for (int keyBits = minKeyBits; keyBits <= maxKeyBits; keyBits += 32) {
         params->inPublic.publicArea.parameters.rsaDetail.keyBits = keyBits;
         char param_fields[6];
@@ -365,18 +326,18 @@ void test_CreatePrimary(TSS2_SYS_CONTEXT *sapi_context)
         | TPMA_OBJECT_SENSITIVEDATAORIGIN | TPMA_OBJECT_USERWITHAUTH;
     prepare_create_primary_params(&params, objectAttributes);
 
-    if (!strcmp(ctx.type, "all")) {
+    if (!strcmp(options.type, "all")) {
         test_CreatePrimary_detail(sapi_context, &params, TPM2_ALG_RSA);
         test_CreatePrimary_detail(sapi_context, &params, TPM2_ALG_ECC);
         test_CreatePrimary_detail(sapi_context, &params, TPM2_ALG_SYMCIPHER);
         test_CreatePrimary_detail(sapi_context, &params, TPM2_ALG_KEYEDHASH);
-    } else if (!strcmp(ctx.type, "rsa")) {
+    } else if (!strcmp(options.type, "rsa")) {
         test_CreatePrimary_detail(sapi_context, &params, TPM2_ALG_RSA);
-    } else if (!strcmp(ctx.type, "ecc")) {
+    } else if (!strcmp(options.type, "ecc")) {
         test_CreatePrimary_detail(sapi_context, &params, TPM2_ALG_ECC);
-    } else if (!strcmp(ctx.type, "symcipher")) {
+    } else if (!strcmp(options.type, "symcipher")) {
         test_CreatePrimary_detail(sapi_context, &params, TPM2_ALG_SYMCIPHER);
-    } else if (!strcmp(ctx.type, "keyedhash")) {
+    } else if (!strcmp(options.type, "keyedhash")) {
         test_CreatePrimary_detail(sapi_context, &params, TPM2_ALG_KEYEDHASH);
     } else {
         fprintf(stderr, "Unknown algorithm!\n");

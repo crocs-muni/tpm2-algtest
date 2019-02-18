@@ -2,12 +2,12 @@
 #include "create.h"
 #include "createprimary.h"
 #include "util.h"
-#include "context.h"
+#include "options.h"
 
 #include <string.h>
 #include <stdio.h>
 
-extern struct tpm_algtest_ctx ctx;
+extern struct tpm_algtest_options options;
 
 static
 TPM2_RC create_RSA_signing_parent(TSS2_SYS_CONTEXT *sapi_context,
@@ -91,7 +91,7 @@ void test_and_measure(TSS2_SYS_CONTEXT *sapi_context, char *param_fields,
     struct summary summary;
     init_summary(&summary);
 
-    unsigned repetitions = ctx.repetitions ? ctx.repetitions : 100;
+    unsigned repetitions = options.repetitions ? options.repetitions : 100;
     for (unsigned i = 0; i < repetitions; ++i) {
         TPMT_SIGNATURE signature;
         TSS2L_SYS_AUTH_RESPONSE rspAuthsArray; // sessionsDataOut
