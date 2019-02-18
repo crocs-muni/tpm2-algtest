@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 
 void init_summary(struct summary *summary)
 {
@@ -14,10 +15,10 @@ void init_summary(struct summary *summary)
     summary->seen_error_codes.count = 0;
 }
 
-double get_duration_sec(struct timespec *start, struct timespec *end)
+double get_duration_s(struct timespec *start, struct timespec *end)
 {
     return (end->tv_sec - start->tv_sec)
-         + (end->tv_nsec - start->tv_nsec) / 1000000000.0;
+         + (end->tv_nsec - start->tv_nsec) / (double) (1000 * 1000 * 1000);
 }
 
 double mean(double values[], int num_values)
@@ -92,10 +93,16 @@ void fill_error_codes_string(char *error_codes_string, struct rc_array *error_co
     }
 }
 
-FILE *open_csv(const char *filename, const char *header, const char *mode)
+FILE *open_csv(const char *filename, const char *header)
 {
+    struct stat sb;
+    if (stat("csv", &sb) == -1) {
+        umask(0000);
+        mkdir("csv", 0777);
+    }
+
     char path[256] = "csv/";
-    FILE *file = fopen(strncat(path, filename, 251), mode); // 256 - csv/ - nul
+    FILE *file = fopen(strncat(path, filename, 251), "w"); // 256 - csv/ - nul
     if (!file) {
         perror(strerror(errno));
         exit(1);

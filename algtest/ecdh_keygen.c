@@ -1,11 +1,11 @@
 #include "ecdh_keygen.h"
 #include "createprimary.h"
-#include "context.h"
+#include "options.h"
 #include "util.h"
 
 #include <stdio.h>
 
-extern struct tpm_algtest_ctx ctx;
+extern struct tpm_algtest_options options;
 
 static
 void test_and_measure(TSS2_SYS_CONTEXT *sapi_context, TPM2_ECC_CURVE curve,
@@ -27,7 +27,7 @@ void test_and_measure(TSS2_SYS_CONTEXT *sapi_context, TPM2_ECC_CURVE curve,
         .auths = { sessionData }
     };
 
-    unsigned repetitions = ctx.repetitions ? ctx.repetitions : 100;
+    unsigned repetitions = options.repetitions ? options.repetitions : 100;
     for (unsigned i = 0; i < repetitions; ++i) {
         /* Response paramters have to be cleared before each run. */
         TPM2B_ECC_POINT zPoint = { .size = 0 };

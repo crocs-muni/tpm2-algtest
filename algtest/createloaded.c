@@ -1,12 +1,12 @@
 #include "createloaded.h"
 #include "create.h"
 #include "util.h"
-#include "context.h"
+#include "options.h"
 
 #include <stdio.h>
 #include <string.h>
 
-extern struct tpm_algtest_ctx ctx;
+extern struct tpm_algtest_options options;
 
 static
 void test_and_measure(TSS2_SYS_CONTEXT *sapi_context, char *param_fields,
@@ -23,7 +23,7 @@ void test_and_measure(TSS2_SYS_CONTEXT *sapi_context, char *param_fields,
         .size = params->inPublic.size
     };
     memcpy(&inPublic.buffer, &params->inPublic.publicArea, params->inPublic.size);
-    unsigned repetitions = ctx.repetitions ? ctx.repetitions : 100;
+    unsigned repetitions = options.repetitions ? options.repetitions : 100;
     for (int i = 0; i < repetitions; ++i) {
         /* Response paramters have to be cleared before each run. */
         TPM2_HANDLE objectHandle;
@@ -172,8 +172,8 @@ static
 void test_RSA(TSS2_SYS_CONTEXT *sapi_context, struct create_params *params,
         TPMI_DH_OBJECT parentHandle, FILE* out, FILE* out_all)
 {
-    const int minKeyBits = ctx.keylen ? ctx.keylen : 0;
-    const int maxKeyBits = ctx.keylen ? ctx.keylen : TPM2_MAX_RSA_KEY_BYTES * 8;
+    const int minKeyBits = options.keylen ? options.keylen : 0;
+    const int maxKeyBits = options.keylen ? options.keylen : TPM2_MAX_RSA_KEY_BYTES * 8;
     for (int keyBits = minKeyBits; keyBits <= maxKeyBits; keyBits += 32) {
         params->inPublic.publicArea.parameters.rsaDetail.keyBits = keyBits;
         char param_fields[6];
@@ -200,8 +200,8 @@ static
 void test_SYMCIPHER(TSS2_SYS_CONTEXT *sapi_context, struct create_params *params,
         TPMI_DH_OBJECT parentHandle, FILE* out, FILE* out_all)
 {
-    const int minKeyBits = ctx.keylen ? ctx.keylen : 0;
-    const int maxKeyBits = ctx.keylen ? ctx.keylen : TPM2_MAX_SYM_KEY_BYTES * 8;
+    const int minKeyBits = options.keylen ? options.keylen : 0;
+    const int maxKeyBits = options.keylen ? options.keylen : TPM2_MAX_SYM_KEY_BYTES * 8;
     for (TPMI_ALG_SYM_OBJECT algorithm = TPM2_ALG_FIRST;
             algorithm < TPM2_ALG_LAST; ++algorithm) {
         params->inPublic.publicArea.parameters.symDetail.sym.algorithm
@@ -318,18 +318,18 @@ void test_CreateLoaded(TSS2_SYS_CONTEXT *sapi_context)
     struct create_params params;
     prepare_create_params(&params);
 
-    if (!strcmp(ctx.algorithm, "all")) {
+    if (!strcmp(options.algorithm, "all")) {
         test_CreateLoaded_detail(sapi_context, &params, parentHandle, TPM2_ALG_RSA);
         test_CreateLoaded_detail(sapi_context, &params, parentHandle, TPM2_ALG_ECC);
         test_CreateLoaded_detail(sapi_context, &params, parentHandle, TPM2_ALG_SYMCIPHER);
         test_CreateLoaded_detail(sapi_context, &params, parentHandle, TPM2_ALG_KEYEDHASH);
-    } else if (!strcmp(ctx.algorithm, "rsa")) {
+    } else if (!strcmp(options.algorithm, "rsa")) {
         test_CreateLoaded_detail(sapi_context, &params, parentHandle, TPM2_ALG_RSA);
-    } else if (!strcmp(ctx.algorithm, "ecc")) {
+    } else if (!strcmp(options.algorithm, "ecc")) {
         test_CreateLoaded_detail(sapi_context, &params, parentHandle, TPM2_ALG_ECC);
-    } else if (!strcmp(ctx.algorithm, "symcipher")) {
+    } else if (!strcmp(options.algorithm, "symcipher")) {
         test_CreateLoaded_detail(sapi_context, &params, parentHandle, TPM2_ALG_SYMCIPHER);
-    } else if (!strcmp(ctx.algorithm, "keyedhash")) {
+    } else if (!strcmp(options.algorithm, "keyedhash")) {
         test_CreateLoaded_detail(sapi_context, &params, parentHandle, TPM2_ALG_KEYEDHASH);
     } else {
         fprintf(stderr, "Unknown algorithm!\n");
