@@ -9,7 +9,8 @@ struct keygen_scenario {
     TPM2_ALG_ID type;
     TPMI_RSA_KEY_BITS keyBits;
     TPM2_ECC_CURVE curveID;
-    bool output_keys;
+    bool export_public;
+    bool export_private;
 };
 
 struct keygen_data_point {

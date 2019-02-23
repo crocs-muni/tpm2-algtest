@@ -1,9 +1,11 @@
-#include "create_util.h"
+#include "object_util.h"
 #include "logging.h"
 #include "util.h"
 
 #include <tss2/tss2_sys.h>
+#include <tss2/tss2_mu.h>
 #include <time.h>
+#include <string.h>
 
 TPM2_RC test_parms(
         TSS2_SYS_CONTEXT *sapi_context,
@@ -22,6 +24,7 @@ TSS2L_SYS_AUTH_COMMAND prepare_session()
     TPMS_AUTH_COMMAND sessionData = {
         .sessionHandle = TPM2_RS_PW,                // TPMI_SH_AUTH_SESSION
         .nonce = { .size = 0, /* .buffer */ },      // TPM2B_NONCE
+        // TODO try removing this flag
         .sessionAttributes = TPMA_SESSION_CONTINUESESSION, // TPMA_SESSION
         .hmac = { .size = 0, /* .buffer */ }        // TPM2B_AUTH
     };
@@ -33,8 +36,58 @@ TSS2L_SYS_AUTH_COMMAND prepare_session()
     return cmdAuthsArray;
 }
 
+TSS2L_SYS_AUTH_COMMAND prepare_dup_policy_session(TSS2_SYS_CONTEXT *sapi_context,
+        TPMI_SH_AUTH_SESSION *sessionHandle)
+{
+    TPMI_DH_OBJECT tpmKey = TPM2_RH_NULL;
+    TPMI_DH_ENTITY bind = TPM2_RH_NULL;
+    TPM2B_NONCE nonceCaller = { .size = 16 };
+    TPM2B_ENCRYPTED_SECRET encryptedSalt = { .size = 0 };
+    TPM2_SE sessionType = TPM2_SE_POLICY;
+    TPMT_SYM_DEF symmetric = { .algorithm = TPM2_ALG_NULL };
+    TPMI_ALG_HASH authHash = TPM2_ALG_SHA256;
+    TPM2B_NONCE nonceTPM = { .size = 0 };
+    TSS2L_SYS_AUTH_RESPONSE rspAuthsArray;
+    TPM2_RC rc = Tss2_Sys_StartAuthSession(sapi_context,
+            tpmKey, bind, NULL, &nonceCaller, &encryptedSalt, sessionType,
+            &symmetric, authHash, sessionHandle, &nonceTPM, &rspAuthsArray);
+    if (rc != TPM2_RC_SUCCESS) {
+        log_error("Cannot start DUP policy session! (%0x4)", rc);
+    }
+    TPM2B_DIGEST authPolicy;
+    rc = Tss2_Sys_PolicyCommandCode(sapi_context, *sessionHandle, NULL,
+            TPM2_CC_Duplicate, NULL);
+    if (rc != TPM2_RC_SUCCESS) {
+        log_error("Cannot policy command code %04x", rc);
+    }
+    rc = Tss2_Sys_PolicyGetDigest(sapi_context, *sessionHandle, NULL, &authPolicy, NULL);
+    if (rc != TPM2_RC_SUCCESS) {
+        log_error("Cannot get digest (%0x4)", rc);
+    } else {
+        log_info("policy session");
+        log_info("%d", authPolicy.size);
+        for (int i = 0; i < authPolicy.size; ++i) {
+            fprintf(stderr, "%02x", authPolicy.buffer[i]);
+        }
+        fprintf(stderr, "\n");
+    }
+
+    TPMS_AUTH_COMMAND sessionData = {
+        .sessionHandle = *sessionHandle,
+        .nonce = { .size = 0 },
+        .sessionAttributes = TPMA_SESSION_CONTINUESESSION,
+        .hmac = { .size = 0 }
+    };
+    TSS2L_SYS_AUTH_COMMAND cmdAuthsArray = {
+        .count = 1,
+        .auths = { sessionData }
+    };
+    return cmdAuthsArray;
+}
+
 TPM2B_SENSITIVE_CREATE prepare_null_authorization()
 {
+
     return (TPM2B_SENSITIVE_CREATE) {
         .size = 0,
         .sensitive = {
@@ -106,6 +159,44 @@ TPM2B_PUBLIC prepare_template_SYMCIPHER_primary()
     };
 }
 
+TPM2B_DIGEST create_dup_policy(TSS2_SYS_CONTEXT *sapi_context)
+{
+    TPMI_DH_OBJECT tpmKey = TPM2_RH_NULL;
+    TPMI_DH_ENTITY bind = TPM2_RH_NULL;
+    TPM2B_NONCE nonceCaller = { .size = 16 };
+    TPM2B_ENCRYPTED_SECRET encryptedSalt = { .size = 0 };
+    TPM2_SE sessionType = TPM2_SE_TRIAL;
+    TPMT_SYM_DEF symmetric = { .algorithm = TPM2_ALG_NULL };
+    TPMI_ALG_HASH authHash =  TPM2_ALG_SHA256;
+    TPM2B_NONCE nonceTPM = { .size = 0 };
+    TPMI_SH_AUTH_SESSION sessionHandle;
+    TPM2_RC rc = Tss2_Sys_StartAuthSession(sapi_context, tpmKey, bind, NULL,
+            &nonceCaller, &encryptedSalt, sessionType, &symmetric, authHash,
+            &sessionHandle, &nonceTPM, NULL);
+    if (rc != TPM2_RC_SUCCESS) {
+        log_error("Cannot create trial session! (%04x)", rc);
+    }
+    TPM2B_DIGEST authPolicy;
+    rc = Tss2_Sys_PolicyCommandCode(sapi_context, sessionHandle, NULL,
+            TPM2_CC_Duplicate, NULL);
+    if (rc != TPM2_RC_SUCCESS) {
+        log_error("Cannot policy command code %04x", rc);
+    }
+    rc = Tss2_Sys_PolicyGetDigest(sapi_context, sessionHandle, NULL, &authPolicy, NULL);
+    if (rc != TPM2_RC_SUCCESS) {
+        log_error("Cannot get digest (%0x4)", rc);
+    } else {
+        log_info("trial policy:");
+        log_info("%d", authPolicy.size);
+        for (int i = 0; i < authPolicy.size; ++i) {
+            fprintf(stderr, "%02x", authPolicy.buffer[i]);
+        }
+        fprintf(stderr, "\n");
+    }
+    Tss2_Sys_FlushContext(sapi_context, sessionHandle);
+    return authPolicy;
+}
+
 TPM2B_PUBLIC prepare_template_RSA(TPMI_RSA_KEY_BITS keyBits)
 {
     return (TPM2B_PUBLIC) {
@@ -116,8 +207,8 @@ TPM2B_PUBLIC prepare_template_RSA(TPMI_RSA_KEY_BITS keyBits)
             .objectAttributes =
                 TPMA_OBJECT_SIGN_ENCRYPT
                 | TPMA_OBJECT_DECRYPT
-                | TPMA_OBJECT_FIXEDTPM
-                | TPMA_OBJECT_FIXEDPARENT
+                //| TPMA_OBJECT_FIXEDTPM
+                //| TPMA_OBJECT_FIXEDPARENT
                 | TPMA_OBJECT_SENSITIVEDATAORIGIN
                 | TPMA_OBJECT_USERWITHAUTH,
             .authPolicy = { .size = 0 },
@@ -238,6 +329,8 @@ TPM2_RC create(
         TSS2_SYS_CONTEXT *sapi_context,
         const TPM2B_PUBLIC *inPublic,
         TPMI_DH_OBJECT primary_handle,
+        TPM2B_PUBLIC *outPublic,
+        TPM2B_PRIVATE *outPrivate,
         double *duration)
 {
     /* Cmd parameters */
@@ -247,8 +340,6 @@ TPM2_RC create(
     TPML_PCR_SELECTION creationPCR = { .count = 0 };
 
     /* Rsp parameters */
-    TPM2B_PRIVATE outPrivate = { .size = 0 };
-    TPM2B_PUBLIC outPublic = { .size = 0 };
     TPM2B_CREATION_DATA creationData = { .size = 0 };
     TPM2B_DIGEST creationHash = { .size = 0 };
     TPMT_TK_CREATION creationTicket;
@@ -260,15 +351,56 @@ TPM2_RC create(
     TPM2_RC rc = Tss2_Sys_Create(sapi_context,
             primary_handle, &cmdAuthsArray,
             &inSensitive, inPublic, &outsideInfo, &creationPCR,
-            &outPrivate, &outPublic, &creationData, &creationHash,
+            outPrivate, outPublic, &creationData, &creationHash,
             &creationTicket, &rspAuthsArray);
 
     clock_gettime(CLOCK_MONOTONIC, &end);
     if (duration != NULL) {
         *duration = get_duration_s(&start, &end);
     }
+
     return rc;
 }
+
+TPM2_RC load(
+        TSS2_SYS_CONTEXT *sapi_context,
+        TPMI_DH_OBJECT parentHandle,
+        TPM2B_PRIVATE *inPrivate,
+        TPM2B_PUBLIC *inPublic,
+        TPM2_HANDLE *objectHandle)
+{
+    TSS2L_SYS_AUTH_COMMAND cmdAuthsArray = prepare_session();
+    TPM2B_NAME name = { .size = 0 };
+    TSS2L_SYS_AUTH_RESPONSE rspAuthsArray;
+    TPM2_RC rc = Tss2_Sys_Load(sapi_context, parentHandle, &cmdAuthsArray,
+            inPrivate, inPublic, objectHandle, &name, &rspAuthsArray);
+    return rc;
+}
+
+TPM2_RC extract_sensitive(
+        TSS2_SYS_CONTEXT *sapi_context,
+        TPMI_DH_OBJECT objectHandle,
+        TPMU_SENSITIVE_COMPOSITE *sensitive)
+{
+    TPMI_SH_AUTH_SESSION sessionHandle;
+    TSS2L_SYS_AUTH_COMMAND cmdAuthsArray = prepare_dup_policy_session(sapi_context, &sessionHandle);
+    TPM2B_DATA encryptionKeyIn = { .size = 0 };
+    TPMT_SYM_DEF_OBJECT symmetricAlg = { .algorithm = TPM2_ALG_NULL };
+    TPM2B_DATA encryptionKeyOut;
+    TPM2B_ENCRYPTED_SECRET outSymSeed;
+    TSS2L_SYS_AUTH_RESPONSE rspAuthsArray;
+    TPM2B_PRIVATE duplicate;
+    TPM2_RC rc = Tss2_Sys_Duplicate(sapi_context, objectHandle, TPM2_RH_NULL,
+            &cmdAuthsArray, &encryptionKeyIn, &symmetricAlg,
+            &encryptionKeyOut, &duplicate, &outSymSeed, &rspAuthsArray);
+    Tss2_Sys_FlushContext(sapi_context, sessionHandle);
+
+    TPM2B_SENSITIVE s = { .size = 0 };
+    Tss2_MU_TPM2B_SENSITIVE_Unmarshal(duplicate.buffer, duplicate.size, 0, &s);
+    *sensitive = s.sensitiveArea.sensitive;
+    return rc;
+}
+
 #if 0
 TPM2_RC create_SYMCIPHER_primary(
         TSS2_SYS_CONTEXT *sapi_context,

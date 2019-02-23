@@ -24,6 +24,8 @@
 struct tpm_algtest_options options = {
     .repetitions = 0,
     .max_duration_s = 0,
+    .export_public = false,
+    .export_private = false,
     .scenario = "none",
     .command = "all",
     .type = "all",
@@ -51,11 +53,20 @@ bool on_option(char key, char *value)
     case 'l':
         options.keylen = atoi(value);
         break;
+    case 'C':
+        options.curveid = strtol(value, NULL, 0);
+        break;
     case 'n':
         options.repetitions = atoi(value);
         break;
     case 'a':
         options.algorithm = value;
+        break;
+    case 'p':
+        options.export_public = true;
+        break;
+    case 'P':
+        options.export_private = true;
         break;
     }
     return true;
@@ -69,9 +80,12 @@ bool tpm2_tool_onstart(tpm2_options **opts)
         { "type", required_argument, NULL, 't' },
         { "command", required_argument, NULL, 'c' },
         { "keylen", required_argument, NULL, 'l' },
-        { "algorithm", required_argument, NULL, 'a' }
+        { "curveid", required_argument, NULL, 'C' },
+        { "algorithm", required_argument, NULL, 'a' },
+        { "exportpublic", no_argument, NULL, 'p' },
+        { "exportprivate", no_argument, NULL, 'P' },
     };
-    *opts = tpm2_options_new("s:d:n:t:c:l:a:", ARRAY_LEN(topts), topts, on_option, NULL, 0);
+    *opts = tpm2_options_new("s:d:n:t:c:l:C:a:", ARRAY_LEN(topts), topts, on_option, NULL, 0);
 
     return *opts != NULL;
 }
@@ -126,10 +140,26 @@ int tpm2_tool_onrun(TSS2_SYS_CONTEXT *sapi_context, tpm2_option_flags flags)
         .repetitions = options.repetitions,
         .max_duration_s = options.max_duration_s,
     };
+    set_default_parameters(&parameters, 100, UINT_MAX);
 
     if (strcmp(options.scenario, "keygen") == 0) {
-        set_default_parameters(&parameters, 100, UINT_MAX);
-        test_keygen_all(sapi_context, &parameters);
+        if (strcmp(options.type, "all") == 0) {
+            test_keygen_all(sapi_context, &parameters);
+        } else {
+            struct keygen_scenario scenario = {
+                .parameters = parameters,
+                .export_public = options.export_public,
+                .export_private = options.export_private
+            };
+            if (strcmp(options.type, "rsa") == 0) {
+                scenario.type = TPM2_ALG_RSA;
+                scenario.keyBits = options.keylen;
+            } else if (strcmp(options.type, "ecc") == 0) {
+                scenario.type = TPM2_ALG_ECC;
+                scenario.curveID = options.curveid;
+            }
+            test_keygen(sapi_context, &scenario);
+        }
     }
     return 0;
 }
