@@ -33,7 +33,7 @@ set(SOURCES
     ${ALGTEST_SRC}/logging.c
     ${ALGTEST_SRC}/scenario.c
     ${ALGTEST_SRC}/keygen.c
-    ${ALGTEST_SRC}/create_util.c
+    ${ALGTEST_SRC}/object_util.c
     ${ALGTEST_SRC}/createprimary.c
     #${ALGTEST_SRC}/create.c
     #${ALGTEST_SRC}/createloaded.c

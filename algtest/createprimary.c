@@ -2,7 +2,7 @@
 #include "options.h"
 #include "util.h"
 #include "tpm2_util.h"
-#include "create_util.h"
+#include "object_util.h"
 #include "create.h"
 
 #include <stdio.h>

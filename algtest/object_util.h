@@ -21,4 +21,20 @@ TPM2_RC create(
         TSS2_SYS_CONTEXT *sapi_context,
         const TPM2B_PUBLIC *inPublic,
         TPMI_DH_OBJECT primary_handle,
+        TPM2B_PUBLIC *outPublic,
+        TPM2B_PRIVATE *outPrivate,
         double *duration);
+
+TPM2_RC load(
+        TSS2_SYS_CONTEXT *sapi_context,
+        TPMI_DH_OBJECT parentHandle,
+        TPM2B_PRIVATE *inPrivate,
+        TPM2B_PUBLIC *inPublic,
+        TPM2_HANDLE *objectHandle);
+
+TPM2_RC extract_sensitive(
+        TSS2_SYS_CONTEXT *sapi_context,
+        TPMI_DH_OBJECT objectHandle,
+        TPMU_SENSITIVE_COMPOSITE *sensitive);
+
+TPM2B_DIGEST create_dup_policy(TSS2_SYS_CONTEXT *sapi_context);

@@ -1,12 +1,18 @@
 #include "keygen.h"
+#include "options.h"
 #include "logging.h"
-#include "create_util.h"
+#include "object_util.h"
 #include "util.h"
 
 #include <tss2/tss2_sys.h>
 #include <stdlib.h>
 #include <stdio.h>
 
+extern struct tpm_algtest_options options;
+
+/*
+ * Result needs to be allocated at this point
+ */
 bool test_detail(
         TSS2_SYS_CONTEXT *sapi_context,
         TPMI_DH_OBJECT primary_handle,
@@ -26,6 +32,10 @@ bool test_detail(
         return false;
     }
 
+    if (scenario->export_private) {
+        inPublic.publicArea.authPolicy = create_dup_policy(sapi_context);
+    }
+
     TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
     if (rc != TPM2_RC_SUCCESS) {
         return false;
@@ -34,20 +44,63 @@ bool test_detail(
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
     for (unsigned i = 0; i < scenario->parameters.repetitions; ++i) {
-        result->data_points[i].rc = create(sapi_context, &inPublic,
-                primary_handle, &result->data_points[i].duration_s);
-        ++result->size;
-        log_info("Keygen: type %04x | keybits %d | curve %04x | duration %f | rc %04x",
-                scenario->type, scenario->keyBits, scenario->curveID,
-                result->data_points[i].duration_s, result->data_points[i].rc);
-        if (scenario->output_keys) {
-
-        }
 
         clock_gettime(CLOCK_MONOTONIC, &end);
         if (get_duration_s(&start, &end) > scenario->parameters.max_duration_s) {
             break;
         }
+
+        // TODO put into separate function (keygen)
+        TPM2B_PUBLIC outPublic = { .size = 0 };
+        TPM2B_PRIVATE outPrivate = { .size = 0 };
+
+        result->data_points[i].rc = create(sapi_context, &inPublic,
+                primary_handle, &outPublic, &outPrivate,
+                &result->data_points[i].duration_s);
+
+        ++result->size;
+        log_info("Keygen: type %04x | keybits %d | curve %04x | duration %f | rc %04x",
+                scenario->type, scenario->keyBits, scenario->curveID,
+                result->data_points[i].duration_s, result->data_points[i].rc);
+
+        if (result->data_points[i].rc != TPM2_RC_SUCCESS) {
+            continue;
+        }
+
+        if (scenario->export_public && scenario->type == TPM2_ALG_RSA) {
+            result->public_keys[i] = outPublic.publicArea.unique;
+            log_info("public key size: %d", result->public_keys[i].rsa.size);
+            for (int j = 0; j < result->public_keys[i].rsa.size; ++j) {
+                fprintf(stderr, "%02x", result->public_keys[i].rsa.buffer[j]);
+            }
+            fprintf(stderr, "\n");
+        }
+
+        if (scenario->export_private && scenario->type == TPM2_ALG_RSA) {
+            TPM2_HANDLE object_handle;
+            rc = load(sapi_context, primary_handle, &outPrivate, &outPublic,
+                    &object_handle);
+            if (rc != TPM2_RC_SUCCESS) {
+                log_warning("Keygen: Cannot load object into TPM! (%04x)", rc);
+                continue;
+            }
+            TPMU_SENSITIVE_COMPOSITE sensitive;
+            rc = extract_sensitive(sapi_context, object_handle, &sensitive);
+            Tss2_Sys_FlushContext(sapi_context, object_handle);
+
+            if (rc != TPM2_RC_SUCCESS) {
+                log_warning("Keygen: Cannot extract private key! (%04x)", rc);
+                continue;
+            } else {
+                TPM2B_PRIVATE_KEY_RSA private_key = sensitive.rsa;
+                log_info("private key size: %d", private_key.size);
+                for (int j = 0; j < private_key.size; ++j) {
+                    fprintf(stderr, "%02x", private_key.buffer[j]);
+                }
+                fprintf(stderr, "\n");
+            }
+        }
+
     }
     return true;
 }
@@ -86,7 +139,7 @@ bool alloc_result(const struct keygen_scenario *scenario,
         return false;
     }
 
-    if (scenario->output_keys) {
+    if (scenario->export_public) {
         result->public_keys = calloc(scenario->parameters.repetitions,
                 sizeof(TPMU_PUBLIC_ID));
         if (result->public_keys == NULL) {
@@ -102,7 +155,9 @@ void free_result(const struct keygen_scenario *scenario,
         struct keygen_result *result)
 {
     free(result->data_points);
-    free(result->public_keys);
+    if (scenario->export_public) {
+        free(result->public_keys);
+    }
 }
 
 bool test_keygen_on_primary(TSS2_SYS_CONTEXT *sapi_context,
@@ -154,6 +209,7 @@ bool test_keygen(TSS2_SYS_CONTEXT *sapi_context,
     if (!ok) {
         return false;
     }
+    // TODO deal with incomplete scenario
     ok = test_keygen_on_primary(sapi_context, scenario, primary_handle);
 
     Tss2_Sys_FlushContext(sapi_context, primary_handle);
@@ -167,7 +223,8 @@ void test_keygen_all(TSS2_SYS_CONTEXT *sapi_context,
         .parameters = *parameters,
         .keyBits = 0,
         .curveID = 0x0000,
-        .output_keys = false
+        .export_public = options.export_public,
+        .export_private = options.export_private,
     };
 
     TPMI_DH_OBJECT primary_handle;
