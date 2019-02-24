@@ -63,13 +63,6 @@ TSS2L_SYS_AUTH_COMMAND prepare_dup_policy_session(TSS2_SYS_CONTEXT *sapi_context
     rc = Tss2_Sys_PolicyGetDigest(sapi_context, *sessionHandle, NULL, &authPolicy, NULL);
     if (rc != TPM2_RC_SUCCESS) {
         log_error("Cannot get digest (%0x4)", rc);
-    } else {
-        log_info("policy session");
-        log_info("%d", authPolicy.size);
-        for (int i = 0; i < authPolicy.size; ++i) {
-            fprintf(stderr, "%02x", authPolicy.buffer[i]);
-        }
-        fprintf(stderr, "\n");
     }
 
     TPMS_AUTH_COMMAND sessionData = {
@@ -83,80 +76,6 @@ TSS2L_SYS_AUTH_COMMAND prepare_dup_policy_session(TSS2_SYS_CONTEXT *sapi_context
         .auths = { sessionData }
     };
     return cmdAuthsArray;
-}
-
-TPM2B_SENSITIVE_CREATE prepare_null_authorization()
-{
-
-    return (TPM2B_SENSITIVE_CREATE) {
-        .size = 0,
-        .sensitive = {
-            .userAuth = { .size = 0 },
-            .data = { .size = 0 }
-        }
-    };
-}
-
-TPM2B_PUBLIC prepare_template_RSA_primary(TPMI_RSA_KEY_BITS keyBits)
-{
-    return (TPM2B_PUBLIC) {
-        .size = 0,
-        .publicArea = {
-            .type = TPM2_ALG_RSA,
-            .nameAlg = TPM2_ALG_SHA256,
-            .objectAttributes =
-                TPMA_OBJECT_RESTRICTED
-                | TPMA_OBJECT_DECRYPT
-                | TPMA_OBJECT_FIXEDTPM
-                | TPMA_OBJECT_FIXEDPARENT
-                | TPMA_OBJECT_SENSITIVEDATAORIGIN
-                | TPMA_OBJECT_USERWITHAUTH,
-            .authPolicy = { .size = 0 },
-            .parameters = {
-                .rsaDetail = {
-            //        .symmetric = TPM2_ALG_NULL,
-
-                    .symmetric = {
-                        .algorithm = TPM2_ALG_AES,
-                        .keyBits = 128,
-                        .mode = TPM2_ALG_NULL,
-                    },
-
-                    .scheme = TPM2_ALG_NULL,
-                    .keyBits = keyBits,
-                    .exponent = 0
-                }
-            }
-        }
-    };
-}
-
-TPM2B_PUBLIC prepare_template_SYMCIPHER_primary()
-{
-    return (TPM2B_PUBLIC) {
-        .size = 0,
-        .publicArea = {
-            .type = TPM2_ALG_SYMCIPHER,
-            .nameAlg = TPM2_ALG_SHA256,
-            .objectAttributes =
-                TPMA_OBJECT_RESTRICTED
-                | TPMA_OBJECT_DECRYPT
-                | TPMA_OBJECT_FIXEDTPM
-                | TPMA_OBJECT_FIXEDPARENT
-                | TPMA_OBJECT_SENSITIVEDATAORIGIN
-                | TPMA_OBJECT_USERWITHAUTH,
-            .authPolicy = { .size = 0 },
-            .parameters = {
-                .symDetail = {
-                    .sym = {
-                        .algorithm = TPM2_ALG_AES,
-                        .keyBits = { .sym = 128 },
-                        .mode = TPM2_ALG_CFB,
-                    }
-                }
-            }
-        }
-    };
 }
 
 TPM2B_DIGEST create_dup_policy(TSS2_SYS_CONTEXT *sapi_context)
@@ -185,16 +104,20 @@ TPM2B_DIGEST create_dup_policy(TSS2_SYS_CONTEXT *sapi_context)
     rc = Tss2_Sys_PolicyGetDigest(sapi_context, sessionHandle, NULL, &authPolicy, NULL);
     if (rc != TPM2_RC_SUCCESS) {
         log_error("Cannot get digest (%0x4)", rc);
-    } else {
-        log_info("trial policy:");
-        log_info("%d", authPolicy.size);
-        for (int i = 0; i < authPolicy.size; ++i) {
-            fprintf(stderr, "%02x", authPolicy.buffer[i]);
-        }
-        fprintf(stderr, "\n");
     }
     Tss2_Sys_FlushContext(sapi_context, sessionHandle);
     return authPolicy;
+}
+
+TPM2B_SENSITIVE_CREATE prepare_null_authorization()
+{
+    return (TPM2B_SENSITIVE_CREATE) {
+        .size = 0,
+        .sensitive = {
+            .userAuth = { .size = 0 },
+            .data = { .size = 0 }
+        }
+    };
 }
 
 TPM2B_PUBLIC prepare_template_RSA(TPMI_RSA_KEY_BITS keyBits)
@@ -207,8 +130,6 @@ TPM2B_PUBLIC prepare_template_RSA(TPMI_RSA_KEY_BITS keyBits)
             .objectAttributes =
                 TPMA_OBJECT_SIGN_ENCRYPT
                 | TPMA_OBJECT_DECRYPT
-                //| TPMA_OBJECT_FIXEDTPM
-                //| TPMA_OBJECT_FIXEDPARENT
                 | TPMA_OBJECT_SENSITIVEDATAORIGIN
                 | TPMA_OBJECT_USERWITHAUTH,
             .authPolicy = { .size = 0 },
@@ -234,8 +155,6 @@ TPM2B_PUBLIC prepare_template_ECC(TPMI_ECC_CURVE curveID)
             .objectAttributes =
                 TPMA_OBJECT_SIGN_ENCRYPT
                 | TPMA_OBJECT_DECRYPT
-                | TPMA_OBJECT_FIXEDTPM
-                | TPMA_OBJECT_FIXEDPARENT
                 | TPMA_OBJECT_SENSITIVEDATAORIGIN
                 | TPMA_OBJECT_USERWITHAUTH,
             .authPolicy = { .size = 0 },
@@ -251,6 +170,33 @@ TPM2B_PUBLIC prepare_template_ECC(TPMI_ECC_CURVE curveID)
     };
 }
 
+TPM2B_PUBLIC prepare_template_RSA_primary(TPMI_RSA_KEY_BITS keyBits)
+{
+    TPM2B_PUBLIC public = prepare_template_RSA(keyBits);
+    public.publicArea.objectAttributes |=
+        TPMA_OBJECT_RESTRICTED | TPMA_OBJECT_FIXEDTPM | TPMA_OBJECT_FIXEDPARENT;
+    public.publicArea.objectAttributes &= ~TPMA_OBJECT_SIGN_ENCRYPT;
+    public.publicArea.parameters.rsaDetail.symmetric = (TPMT_SYM_DEF_OBJECT) {
+        .algorithm = TPM2_ALG_AES,
+        .keyBits = 128,
+        .mode = TPM2_ALG_NULL,
+    };
+    return public;
+}
+
+TPM2B_PUBLIC prepare_template_ECC_primary(TPMI_ECC_CURVE curveID)
+{
+    TPM2B_PUBLIC public = prepare_template_ECC(curveID);
+    public.publicArea.objectAttributes |=
+        TPMA_OBJECT_RESTRICTED | TPMA_OBJECT_FIXEDTPM | TPMA_OBJECT_FIXEDPARENT;
+    public.publicArea.objectAttributes &= ~TPMA_OBJECT_SIGN_ENCRYPT;
+    public.publicArea.parameters.eccDetail.symmetric = (TPMT_SYM_DEF_OBJECT) {
+        .algorithm = TPM2_ALG_AES,
+        .keyBits = 128,
+        .mode = TPM2_ALG_NULL,
+    };
+    return public;
+}
 #if 0
 void prepare_create_params(struct create_params *params)
 {
@@ -273,7 +219,7 @@ void prepare_create_params(struct create_params *params)
     params->inPublic = inPublic;
 }
 #endif
-#if 1
+#if 0
 void prepare_create_primary_params(struct create_params *params,
         TPMA_OBJECT objectAttributes)
 {
@@ -292,8 +238,37 @@ void prepare_create_primary_params(struct create_params *params,
     };
     params->inPublic = inPublic;
 }
-
 #endif
+
+TPM2_RC create_some_primary(TSS2_SYS_CONTEXT *sapi_context,
+        TPMI_DH_OBJECT *primary_handle)
+{
+    TPM2B_PUBLIC inPublic;
+    TPM2_RC rc;
+    for (TPMI_ECC_CURVE curveID = 0x0000; curveID <= 0x0020; ++curveID) {
+        inPublic = prepare_template_ECC_primary(curveID);
+        rc = create_primary(sapi_context, &inPublic, primary_handle);
+        if (rc == TPM2_RC_SUCCESS) {
+            log_info("Created ECC 0x%04x primary key", curveID);
+            return rc;
+        }
+    }
+    inPublic = prepare_template_RSA_primary(1024);
+    rc = create_primary(sapi_context, &inPublic, primary_handle);
+    if (rc == TPM2_RC_SUCCESS) {
+        log_info("Created RSA 1024 primary key");
+        return rc;
+    }
+    inPublic = prepare_template_RSA_primary(2048);
+    rc = create_primary(sapi_context, &inPublic, primary_handle);
+    if (rc == TPM2_RC_SUCCESS) {
+        log_info("Created RSA 2048 primary key");
+        return rc;
+    }
+    log_error("Cannot create any primary key! (%04x)", rc);
+    return rc;
+}
+
 TPM2_RC create_primary(
         TSS2_SYS_CONTEXT *sapi_context,
         const TPM2B_PUBLIC *inPublic,
@@ -400,58 +375,3 @@ TPM2_RC extract_sensitive(
     *sensitive = s.sensitiveArea.sensitive;
     return rc;
 }
-
-#if 0
-TPM2_RC create_SYMCIPHER_primary(
-        TSS2_SYS_CONTEXT *sapi_context,
-        TPMI_DH_OBJECT *created_handle)
-{
-    struct create_params params;
-    TPMA_OBJECT objectAttributes =
-        TPMA_OBJECT_RESTRICTED | TPMA_OBJECT_DECRYPT
-        | TPMA_OBJECT_FIXEDTPM | TPMA_OBJECT_FIXEDPARENT
-        | TPMA_OBJECT_SENSITIVEDATAORIGIN | TPMA_OBJECT_USERWITHAUTH;
-    prepare_create_primary_params(&params, objectAttributes);
-
-    /* Create RSA template */
-    params.inPublic.publicArea.type = TPM2_ALG_RSA;
-    TPMU_PUBLIC_PARMS parameters = {
-        .rsaDetail = {          // TPMS_RSA_PARMS
-            .symmetric = {              // TPMT_SYM_DEF_OBJECT
-                .algorithm = TPM2_ALG_AES,  // TPMI_ALG_SYM_OBJECT
-                .keyBits = 128,             // TPMU_SYM_KEY_BITS
-                .mode = TPM2_ALG_NULL,        // TPMU_SYM_MODE
-            },
-            .scheme = TPM2_ALG_NULL,        // TPMT_RSA_SCHEME+
-            .keyBits = 1024,
-            .exponent = 0
-        }
-    };
-    params.inPublic.publicArea.parameters = parameters;
-
-    TPM2_RC rc = test_parms(sapi_context, &params);
-    if (rc != TPM2_RC_SUCCESS) {
-        fprintf(stderr, "TPM2_Create: cannot create parent object! (%04x)\n", rc);
-    }
-
-    TPM2_HANDLE objectHandle;
-    TPM2B_PUBLIC outPublic = { .size = 0 };
-    TPM2B_CREATION_DATA creationData = { .size = 0 };
-    TPM2B_DIGEST creationHash = { .size = 0 };
-    TPMT_TK_CREATION creationTicket;
-    TPM2B_NAME name = { .size = 0 };
-    TSS2L_SYS_AUTH_RESPONSE rspAuthsArray; // sessionsDataOut
-
-    TPMI_RH_HIERARCHY primaryHandle = TPM2_RH_NULL;
-
-    rc = Tss2_Sys_CreatePrimary(sapi_context,
-            primaryHandle, &params.cmdAuthsArray,
-            &params.inSensitive, &params.inPublic, &params.outsideInfo,
-            &params.creationPCR, &objectHandle, &outPublic,
-            &creationData, &creationHash,
-            &creationTicket, &name, &rspAuthsArray);
-
-    *created_handle = objectHandle;
-    return rc;
-}
-#endif

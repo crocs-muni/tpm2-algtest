@@ -2,15 +2,14 @@
 #include <stdbool.h>
 
 struct tpm_algtest_options {
-    unsigned repetitions;
-    unsigned max_duration_s;
-    bool export_public;
-    bool export_private;
+    int repetitions;
+    int max_duration_s;
+    bool export_keys;
     char* scenario;
     char* command;
     char* type;
     char* algorithm;
-    unsigned keylen;
-    unsigned curveid;
-    unsigned verbose;
+    int keylen;
+    int curveid;
+    int verbose;
 };

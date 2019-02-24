@@ -24,8 +24,7 @@
 struct tpm_algtest_options options = {
     .repetitions = 0,
     .max_duration_s = 0,
-    .export_public = false,
-    .export_private = false,
+    .export_keys = false,
     .scenario = "none",
     .command = "all",
     .type = "all",
@@ -62,11 +61,8 @@ bool on_option(char key, char *value)
     case 'a':
         options.algorithm = value;
         break;
-    case 'p':
-        options.export_public = true;
-        break;
-    case 'P':
-        options.export_private = true;
+    case 'x':
+        options.export_keys = true;
         break;
     }
     return true;
@@ -82,10 +78,9 @@ bool tpm2_tool_onstart(tpm2_options **opts)
         { "keylen", required_argument, NULL, 'l' },
         { "curveid", required_argument, NULL, 'C' },
         { "algorithm", required_argument, NULL, 'a' },
-        { "exportpublic", no_argument, NULL, 'p' },
-        { "exportprivate", no_argument, NULL, 'P' },
+        { "exportkeys", no_argument, NULL, 'x' },
     };
-    *opts = tpm2_options_new("s:d:n:t:c:l:C:a:", ARRAY_LEN(topts), topts, on_option, NULL, 0);
+    *opts = tpm2_options_new("s:d:n:t:c:l:C:a:x", ARRAY_LEN(topts), topts, on_option, NULL, 0);
 
     return *opts != NULL;
 }
@@ -148,8 +143,7 @@ int tpm2_tool_onrun(TSS2_SYS_CONTEXT *sapi_context, tpm2_option_flags flags)
         } else {
             struct keygen_scenario scenario = {
                 .parameters = parameters,
-                .export_public = options.export_public,
-                .export_private = options.export_private
+                .export_keys = options.export_keys,
             };
             if (strcmp(options.type, "rsa") == 0) {
                 scenario.type = TPM2_ALG_RSA;
