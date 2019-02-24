@@ -9,8 +9,7 @@ struct keygen_scenario {
     TPM2_ALG_ID type;
     TPMI_RSA_KEY_BITS keyBits;
     TPM2_ECC_CURVE curveID;
-    bool export_public;
-    bool export_private;
+    bool export_keys;
 };
 
 struct keygen_data_point {
@@ -19,9 +18,10 @@ struct keygen_data_point {
 };
 
 struct keygen_result {
-    unsigned size;
+    int size;
     struct keygen_data_point *data_points;
     TPMU_PUBLIC_ID *public_keys;
+    TPMU_SENSITIVE_COMPOSITE *private_keys;
 };
 
 bool test_keygen(TSS2_SYS_CONTEXT *sapi_context,

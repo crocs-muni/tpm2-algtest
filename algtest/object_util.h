@@ -17,6 +17,9 @@ TPM2_RC create_primary(
         const TPM2B_PUBLIC *inPublic,
         TPMI_DH_OBJECT *parent_handle);
 
+TPM2_RC create_some_primary(TSS2_SYS_CONTEXT *sapi_context,
+        TPMI_DH_OBJECT *primary_handle);
+
 TPM2_RC create(
         TSS2_SYS_CONTEXT *sapi_context,
         const TPM2B_PUBLIC *inPublic,
