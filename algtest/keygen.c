@@ -60,8 +60,8 @@ bool test_detail(
                 &result->data_points[i].duration_s);
 
         ++result->size;
-        log_info("Keygen: type %04x | keybits %d | curve %04x | duration %f | rc %04x",
-                scenario->type, scenario->keyBits, scenario->curveID,
+        log_info("Keygen %d: type %04x | keybits %d | curve %04x | duration %f | rc %04x",
+                i, scenario->type, scenario->keyBits, scenario->curveID,
                 result->data_points[i].duration_s, result->data_points[i].rc);
 
         if (result->data_points[i].rc != TPM2_RC_SUCCESS) {
