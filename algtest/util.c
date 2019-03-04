@@ -96,12 +96,12 @@ void fill_error_codes_string(char *error_codes_string, struct rc_array *error_co
 FILE *open_csv(const char *filename, const char *header)
 {
     struct stat sb;
-    if (stat("csv", &sb) == -1) {
+    if (stat("out", &sb) == -1) {
         umask(0000);
-        mkdir("csv", 0777);
+        mkdir("out", 0777);
     }
 
-    char path[256] = "csv/";
+    char path[256] = "out/";
     FILE *file = fopen(strncat(path, filename, 251), "w"); // 256 - csv/ - nul
     if (!file) {
         perror(strerror(errno));
