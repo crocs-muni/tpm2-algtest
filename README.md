@@ -1,14 +1,9 @@
 ### TPM2_AlgTest
 
-Tool for measuring TPM capabilities.
+Tool for measuring TPM capabilities, generated primes etc.
 
 Based on [tpm2-tools](https://github.com/tpm2-software/tpm2-tools) project.
 
-* Install [tpm2-tss](https://github.com/tpm2-software/tpm2-tss), [tpm2-tools](https://github.com/tpm2-software/tpm2-tools) and [tpm2-abrmd](https://github.com/tpm2-software/tpm2-abrmd)
-
-```
-mkdir build
-cd build
-cmake ..
-make
-```
+#### How to use:
+* download a docker image: `docker image pull simonstruk/tpm2-algtest:v0.1`
+* run script: `./run_image.py`
