@@ -202,8 +202,9 @@ bool create_primary_for_keygen(TSS2_SYS_CONTEXT *sapi_context,
 {
     log_info("Keygen: creating primary...");
     TPM2_RC rc = create_some_primary(sapi_context, primary_handle);
-
-    log_info("Created primary object with handle %08x", *primary_handle);
+    if (rc == TPM2_RC_SUCCESS) {
+        log_info("Created primary object with handle %08x", *primary_handle);
+    }
     return rc == TPM2_RC_SUCCESS;
 }
 

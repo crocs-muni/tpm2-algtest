@@ -135,7 +135,7 @@ int tpm2_tool_onrun(TSS2_SYS_CONTEXT *sapi_context, tpm2_option_flags flags)
         .repetitions = options.repetitions,
         .max_duration_s = options.max_duration_s,
     };
-    set_default_parameters(&parameters, 100, UINT_MAX);
+    set_default_parameters(&parameters, 1000, UINT_MAX);
 
     if (strcmp(options.scenario, "keygen") == 0) {
         if (strcmp(options.type, "all") == 0) {
