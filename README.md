@@ -1,10 +1,10 @@
-### TPM2_AlgTest
+## TPM2_AlgTest
 
-It has been found out that implementation specifics of cryptographic smart cards can lead to serious vulnerabilities [1](https://en.wikipedia.org/wiki/ROCA_vulnerability). Since TPM chips are often manufactured by the same vendors, we have decided to create a tool that would help with collection of data from various TPMs that could be used for further analysis and discovery of similar bugs.
+It has been found out that implementation specifics of cryptographic smart cards can lead to serious vulnerabilities [[1](https://en.wikipedia.org/wiki/ROCA_vulnerability)]. Since TPM chips are often manufactured by the same vendors, we have decided to create a tool that would help with collection of data from various TPMs that could be used for further analysis and discovery of similar bugs.
 
 This project uses sources from [tpm2-tools](https://github.com/tpm2-software/tpm2-tools) project.
 
-#### Want to help?
+### Want to help?
 We are currently in the testing phase and will appreciate your help. If you have a TPM 2.0 chip (most of today's laptops do) and want to help us in the collection of data, please download the `run_image.py` script and run it using the following command (`docker` priviledges are required):
 * `python3 -m run_image fulltest`
 
