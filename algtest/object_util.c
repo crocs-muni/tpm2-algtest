@@ -253,18 +253,21 @@ TPM2_RC create_some_primary(TSS2_SYS_CONTEXT *sapi_context,
             return rc;
         }
     }
+    log_warning("Cannot create any ECC primary key");
     inPublic = prepare_template_RSA_primary(1024);
     rc = create_primary(sapi_context, &inPublic, primary_handle);
     if (rc == TPM2_RC_SUCCESS) {
         log_info("Created RSA 1024 primary key");
         return rc;
     }
+    log_warning("Cannot create RSA 1024 primary key (%04x)", rc);
     inPublic = prepare_template_RSA_primary(2048);
     rc = create_primary(sapi_context, &inPublic, primary_handle);
     if (rc == TPM2_RC_SUCCESS) {
         log_info("Created RSA 2048 primary key");
         return rc;
     }
+    log_warning("Cannot create RSA 2048 primary key (%04x)", rc);
     log_error("Cannot create any primary key! (%04x)", rc);
     return rc;
 }
