@@ -5,7 +5,7 @@ It has been found out that implementation specifics of cryptographic smart cards
 This project uses sources from [tpm2-tools](https://github.com/tpm2-software/tpm2-tools) project.
 
 ### Want to help?
-We are currently in the testing phase and will appreciate your help. If you have a TPM 2.0 chip (most of today's laptops do) and want to help us in the collection of data, please download the `run_image.py` script and run it using the following command (`docker` priviledges are required):
+We are currently in the testing phase and will appreciate your help. If you have a TPM 2.0 chip (most of today's laptops do) and want to help us in the collection of data, please download the [`run_image.py`](https://raw.githubusercontent.com/simon-struk/tpm2-algtest/master/run_image.py) script and run it using the following command (`docker` priviledges are required):
 * `python3 -m run_image fulltest`
 
 The script will pull and run a docker image with tools needed to do the measurement.
