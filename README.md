@@ -12,7 +12,7 @@ You need to have installed [docker](https://www.docker.com/) (`sudo apt-get inst
  
 The script will pull and run a docker image with tools needed to do the measurement.
 
-The main keygen test generates 1000 RSA key pairs on the TPM for each available keylength (usually only two: 1024 and 2048). Depending on speed of generation, this should last up to few hours (for my TPM cca 2 hours) while consuming minimum system resources (the computation usually happens on a separate chip). If you cannot afford to let it run for too long, consider appending option `-d <duration_s>` that limits the time spend per keylength in seconds, e.g. `python3 -m run_image fulltest -d 3600`.
+The main keygen test generates 1000 RSA key pairs on the TPM for each available keylength (usually only two: 1024 and 2048). Depending on speed of generation, this should last up to few hours (2-3 hours with current TPMs) while consuming minimum system resources (the computation usually happens on a separate chip). If you cannot afford to let it run for too long, consider appending option `-d <duration_s>` that limits the time spend per keylength in seconds, e.g. `python3 -m run_image fulltest -d 3600`.
 
 Additionally, the test generates 1000 ECC key pairs for each available elliptic curve. These should be pretty swift.
 
