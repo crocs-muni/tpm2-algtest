@@ -68,7 +68,7 @@ bool test_detail(
             continue;
         }
 
-        if (scenario->export_keys && scenario->type == TPM2_ALG_RSA) {
+        if (scenario->export_keys) {
             result->public_keys[i] = outPublic.publicArea.unique;
             TPM2_HANDLE object_handle;
             rc = load(sapi_context, primary_handle, &outPrivate, &outPublic,
@@ -118,22 +118,46 @@ void output_results(const struct keygen_scenario *scenario,
     }
     fclose(out);
 
-    if (scenario->export_keys && scenario->type == TPM2_ALG_RSA) {
-        out = open_csv(filename_keys, "id;n;e;p;q;d;t");
-        for (int i = 0; i < result->size; ++i) {
-            if (result->data_points[i].rc != TPM2_RC_SUCCESS) {
-                fprintf(out, "null;null;null;null;null;null;null\n");
-                continue;
+    if (scenario->export_keys) {
+        if (scenario->type == TPM2_ALG_RSA) {
+            out = open_csv(filename_keys, "id;n;e;p;q;d;t");
+            for (int i = 0; i < result->size; ++i) {
+                if (result->data_points[i].rc != TPM2_RC_SUCCESS) {
+                    fprintf(out, "null;null;null;null;null;null;null\n");
+                    continue;
+                }
+                fprintf(out, "%d;", i);
+                for (int j = 0; j < result->public_keys[i].rsa.size; ++j) {
+                    fprintf(out, "%02X", result->public_keys[i].rsa.buffer[j]);
+                }
+                fprintf(out, ";010001;");
+                for (int j = 0; j < result->private_keys[i].rsa.size; ++j) {
+                    fprintf(out, "%02X", result->private_keys[i].rsa.buffer[j]);
+                }
+                fprintf(out, "; ; ;%d\n", (int) (result->data_points[i].duration_s * 1000));
             }
-            fprintf(out, "%d;", i);
-            for (int j = 0; j < result->public_keys[i].rsa.size; ++j) {
-                fprintf(out, "%02X", result->public_keys[i].rsa.buffer[j]);
+
+        } else if (scenario->type == TPM2_ALG_ECC) {
+            out = open_csv(filename_keys, "id;x;y;private;t");
+            for (int i = 0; i < result->size; ++i) {
+                if (result->data_points[i].rc != TPM2_RC_SUCCESS) {
+                    fprintf(out, "null;null;null;null;null;null;null\n");
+                    continue;
+                }
+                fprintf(out, "%d;", i);
+                for (int j = 0; j < result->public_keys[i].ecc.x.size; ++j) {
+                    fprintf(out, "%02X", result->public_keys[i].ecc.x.buffer[j]);
+                }
+                fprintf(out, ";");
+                for (int j = 0; j < result->public_keys[i].ecc.y.size; ++j) {
+                    fprintf(out, "%02X", result->public_keys[i].ecc.y.buffer[j]);
+                }
+                fprintf(out, ";");
+                for (int j = 0; j < result->private_keys[i].ecc.size; ++j) {
+                    fprintf(out, "%02X", result->private_keys[i].ecc.buffer[j]);
+                }
+                fprintf(out, ";%d\n", (int) (result->data_points[i].duration_s * 1000));
             }
-            fprintf(out, ";010001;");
-            for (int j = 0; j < result->private_keys[i].rsa.size; ++j) {
-                fprintf(out, "%02X", result->private_keys[i].rsa.buffer[j]);
-            }
-            fprintf(out, "; ; ;%d\n", (int) (result->data_points[i].duration_s * 1000));
         }
     }
 }
