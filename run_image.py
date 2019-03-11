@@ -5,7 +5,7 @@ import argparse
 import sys
 
 device = '/dev/tpm0'
-image_tag = 'v0.2'
+image_tag = 'v0.3'
 
 def zip():
     zipf = zipfile.ZipFile('out.zip', 'w', zipfile.ZIP_DEFLATED)
