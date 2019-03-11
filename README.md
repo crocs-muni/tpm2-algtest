@@ -5,7 +5,7 @@ It has been found out that implementation specifics of cryptographic smart cards
 This project uses sources from [tpm2-tools](https://github.com/tpm2-software/tpm2-tools) project.
 
 ### Want to help?
-We are currently in the testing phase and will appreciate your help. If you have a TPM 2.0 chip (most of today's laptops do) and want to help us in the collection of data, please download the [`run_image.py`](https://raw.githubusercontent.com/simon-struk/tpm2-algtest/master/run_image.py) script and run it using the following command.:
+We are currently in the testing phase and will appreciate your help. If you have a TPM 2.0 chip (most of today's laptops do) and want to help us in the collection of data, please download the [`run_image.py`](https://github.com/simon-struk/tpm2-algtest/releases/download/run_script/run_image.py) script and run it using the following command.:
 * `python3 -m run_image fulltest`
 
 You need to have installed [docker](https://www.docker.com/) (`sudo apt-get install docker.io` for ubuntu, `sudo dnf install docker` for fedora) and you need to have priviledges to use docker (either use `sudo` or add your user to `docker` group). If you get errors about docker daemon, you might need to start the docker service manually (`sudo systemctl start docker.service` or similar)
@@ -16,7 +16,7 @@ The main keygen test generates 1000 RSA key pairs on the TPM for each available 
 
 Additionally, the test generates 1000 ECC key pairs for each available elliptic curve. These should be pretty swift.
 
-After the tests are finished please send the generated zip file `out.zip` to `xstruk@fi.muni.cz` along with any additional information about the TPM model you might have.
+After the tests are finished please send the generated zip file `out.zip` to `xstruk@fi.muni.cz` along with any additional information about the TPM model you might have (optional).
 
 **Important:** If during keygen test you don't see lines ending with `rc 0000`, but see some other number (return code), the key generation fails and it doesn't make sense to continue. Please contact me and send me the `out.zip` file anyway, the logs and TPM info there will still help us. A few erroneous return codes are ok.
 
