@@ -23,3 +23,17 @@ After the tests are finished please send the generated zip file `out.zip` to `xs
 **Important:** If during keygen test you don't see lines ending with `rc 0000`, but see some other number (return code), the key generation fails and it doesn't make sense to continue. Please contact me and send me the `out.zip` file anyway, the logs and TPM info there will still help us. A few erroneous return codes are ok.
 
 If you run into any issues or feel that the computation is taking too long, please contact me on `xstruk@fi.muni.cz`.
+
+### Troubleshooting
+If the script crashes with this message:
+```
+subprocess.CalledProcessError: Command '['docker', 'run', '-it', '--init', '--device=/dev/tpm0', '--entrypoint=tpm2_getcap', 'simonstruk/tpm2-algtest:v0.4', '-c', 'algorithms']' returned non-zero exit status 1.
+```
+check if there is some output int `out/Quicktest_algorithms.txt`. If it says 
+```
+ERROR:sys:src/tss2-sys/api/Tss2_Sys_Execute.c:80:Tss2_Sys_ExecuteFinish() Unsupported device. The device is a TPM 1.2 
+ERROR: Failed to GetCapability: capability: 0x0, property: 0x1, TSS2_RC: 0x80001
+
+ERROR: Unable to run tpm2_getcap
+```
+you have TPM 1.2 which is not compatible for this testing.
