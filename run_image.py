@@ -5,7 +5,7 @@ import argparse
 import sys
 
 device = '/dev/tpm0'
-image_tag = 'v0.3'
+image_tag = 'v0.4'
 
 def zip():
     zipf = zipfile.ZipFile('out.zip', 'w', zipfile.ZIP_DEFLATED)
@@ -63,12 +63,11 @@ def main():
     parser.add_argument('-C', '--curveid', type=int, required=False)
     args = parser.parse_args()
 
-    if args.command == 'pull':
-        subprocess.run([
-            'docker', 'image', 'pull', 'simonstruk/tpm2-algtest:' + image_tag
-            ]).check_returncode()
+    if not os.path.exists(device):
+        print(f'Device {device} not found')
+        return
 
-    elif args.command == 'quicktest':
+    if args.command == 'quicktest':
         os.makedirs('out', exist_ok=True)
         quicktest()
         zip()
