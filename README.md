@@ -8,6 +8,8 @@ This project uses sources from [tpm2-tools](https://github.com/tpm2-software/tpm
 We are currently in the testing phase and will appreciate your help. If you have a TPM 2.0 chip (most of today's laptops do) and want to help us in the collection of data, please download the [`run_image.py`](https://github.com/simon-struk/tpm2-algtest/releases/download/run_script/run_image.py) script and run it using the following command.:
 * `python3 -m run_image fulltest`
 
+**Important:** Please DO NOT suspend or hibernate the computer while running the algtest, it will affect the results! Locking the screen is ok.
+
 You need to have installed [docker](https://www.docker.com/) (`sudo apt-get install docker.io` for ubuntu, `sudo dnf install docker` for fedora) and you need to have priviledges to use docker (either use `sudo` or add your user to `docker` group). If you get errors about docker daemon, you might need to start the docker service manually (`sudo systemctl start docker.service` or similar)
  
 The script will pull and run a docker image with tools needed to do the measurement.
