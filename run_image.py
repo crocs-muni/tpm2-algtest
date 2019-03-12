@@ -67,6 +67,8 @@ def main():
         print(f'Device {device} not found')
         return
 
+    print('IMPORTANT: Please do not suspend or hibernate the computer while testing the TPM!')
+
     if args.command == 'quicktest':
         os.makedirs('out', exist_ok=True)
         quicktest()
