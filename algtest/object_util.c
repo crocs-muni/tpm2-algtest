@@ -179,7 +179,7 @@ TPM2B_PUBLIC prepare_template_RSA_primary(TPMI_RSA_KEY_BITS keyBits)
     public.publicArea.parameters.rsaDetail.symmetric = (TPMT_SYM_DEF_OBJECT) {
         .algorithm = TPM2_ALG_AES,
         .keyBits = 128,
-        .mode = TPM2_ALG_NULL,
+        .mode = TPM2_ALG_CFB,
     };
     return public;
 }
@@ -193,7 +193,7 @@ TPM2B_PUBLIC prepare_template_ECC_primary(TPMI_ECC_CURVE curveID)
     public.publicArea.parameters.eccDetail.symmetric = (TPMT_SYM_DEF_OBJECT) {
         .algorithm = TPM2_ALG_AES,
         .keyBits = 128,
-        .mode = TPM2_ALG_NULL,
+        .mode = TPM2_ALG_CFB,
     };
     return public;
 }
