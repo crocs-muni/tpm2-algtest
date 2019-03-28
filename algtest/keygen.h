@@ -17,11 +17,15 @@ struct keygen_data_point {
     TPM2_RC rc;
 };
 
+struct keygen_keypair {
+    TPMU_PUBLIC_ID public_key;
+    TPMU_SENSITIVE_COMPOSITE private_key;
+};
+
 struct keygen_result {
     int size;
     struct keygen_data_point *data_points;
-    TPMU_PUBLIC_ID *public_keys;
-    TPMU_SENSITIVE_COMPOSITE *private_keys;
+    struct keygen_keypair *keypairs;
 };
 
 bool test_keygen(TSS2_SYS_CONTEXT *sapi_context,

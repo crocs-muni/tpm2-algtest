@@ -31,8 +31,8 @@ TPM2_RC create(
 TPM2_RC load(
         TSS2_SYS_CONTEXT *sapi_context,
         TPMI_DH_OBJECT parentHandle,
-        TPM2B_PRIVATE *inPrivate,
-        TPM2B_PUBLIC *inPublic,
+        const TPM2B_PRIVATE *inPrivate,
+        const TPM2B_PUBLIC *inPublic,
         TPM2_HANDLE *objectHandle);
 
 TPM2_RC extract_sensitive(
