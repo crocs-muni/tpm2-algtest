@@ -10,6 +10,33 @@
 
 extern struct tpm_algtest_options options;
 
+void extract_keys(
+        TSS2_SYS_CONTEXT *sapi_context,
+        TPMI_DH_OBJECT primary_handle,
+        const TPM2B_PUBLIC *outPublic,
+        const TPM2B_PRIVATE *outPrivate,
+        struct keygen_keypair *keypair)
+{
+    keypair->public_key = outPublic->publicArea.unique;
+    TPM2_HANDLE object_handle;
+    TPM2_RC rc = load(sapi_context, primary_handle, outPrivate, outPublic,
+            &object_handle);
+    if (rc != TPM2_RC_SUCCESS) {
+        log_warning("Keygen: Cannot load object into TPM! (%04x)", rc);
+        return;
+    }
+
+    TPMU_SENSITIVE_COMPOSITE sensitive;
+    rc = extract_sensitive(sapi_context, object_handle, &sensitive);
+    Tss2_Sys_FlushContext(sapi_context, object_handle);
+    if (rc != TPM2_RC_SUCCESS) {
+        log_warning("Keygen: Cannot extract private key! (%04x)", rc);
+        return;
+    } else {
+        keypair->private_key = sensitive;
+    }
+}
+
 /*
  * Result needs to be allocated at this point
  */
@@ -51,7 +78,6 @@ bool test_detail(
             break;
         }
 
-        // TODO put into separate function (keygen)
         TPM2B_PUBLIC outPublic = { .size = 0 };
         TPM2B_PRIVATE outPrivate = { .size = 0 };
 
@@ -69,24 +95,8 @@ bool test_detail(
         }
 
         if (scenario->export_keys) {
-            result->public_keys[i] = outPublic.publicArea.unique;
-            TPM2_HANDLE object_handle;
-            rc = load(sapi_context, primary_handle, &outPrivate, &outPublic,
-                    &object_handle);
-            if (rc != TPM2_RC_SUCCESS) {
-                log_warning("Keygen: Cannot load object into TPM! (%04x)", rc);
-                continue;
-            }
-
-            TPMU_SENSITIVE_COMPOSITE sensitive;
-            rc = extract_sensitive(sapi_context, object_handle, &sensitive);
-            Tss2_Sys_FlushContext(sapi_context, object_handle);
-            if (rc != TPM2_RC_SUCCESS) {
-                log_warning("Keygen: Cannot extract private key! (%04x)", rc);
-                continue;
-            } else {
-                result->private_keys[i] = sensitive;
-            }
+            extract_keys(sapi_context, primary_handle, &outPublic, &outPrivate,
+                    &result->keypairs[i]);
         }
     }
     return true;
@@ -127,12 +137,12 @@ void output_results(const struct keygen_scenario *scenario,
                     continue;
                 }
                 fprintf(out, "%d;", i);
-                for (int j = 0; j < result->public_keys[i].rsa.size; ++j) {
-                    fprintf(out, "%02X", result->public_keys[i].rsa.buffer[j]);
+                for (int j = 0; j < result->keypairs[i].public_key.rsa.size; ++j) {
+                    fprintf(out, "%02X", result->keypairs[i].public_key.rsa.buffer[j]);
                 }
                 fprintf(out, ";010001;");
-                for (int j = 0; j < result->private_keys[i].rsa.size; ++j) {
-                    fprintf(out, "%02X", result->private_keys[i].rsa.buffer[j]);
+                for (int j = 0; j < result->keypairs[i].private_key.rsa.size; ++j) {
+                    fprintf(out, "%02X", result->keypairs[i].private_key.rsa.buffer[j]);
                 }
                 fprintf(out, "; ; ;%d\n", (int) (result->data_points[i].duration_s * 1000));
             }
@@ -145,16 +155,16 @@ void output_results(const struct keygen_scenario *scenario,
                     continue;
                 }
                 fprintf(out, "%d;", i);
-                for (int j = 0; j < result->public_keys[i].ecc.x.size; ++j) {
-                    fprintf(out, "%02X", result->public_keys[i].ecc.x.buffer[j]);
+                for (int j = 0; j < result->keypairs[i].public_key.ecc.x.size; ++j) {
+                    fprintf(out, "%02X", result->keypairs[i].public_key.ecc.x.buffer[j]);
                 }
                 fprintf(out, ";");
-                for (int j = 0; j < result->public_keys[i].ecc.y.size; ++j) {
-                    fprintf(out, "%02X", result->public_keys[i].ecc.y.buffer[j]);
+                for (int j = 0; j < result->keypairs[i].public_key.ecc.y.size; ++j) {
+                    fprintf(out, "%02X", result->keypairs[i].public_key.ecc.y.buffer[j]);
                 }
                 fprintf(out, ";");
-                for (int j = 0; j < result->private_keys[i].ecc.size; ++j) {
-                    fprintf(out, "%02X", result->private_keys[i].ecc.buffer[j]);
+                for (int j = 0; j < result->keypairs[i].private_key.ecc.size; ++j) {
+                    fprintf(out, "%02X", result->keypairs[i].private_key.ecc.buffer[j]);
                 }
                 fprintf(out, ";%d\n", (int) (result->data_points[i].duration_s * 1000));
             }
@@ -173,19 +183,11 @@ bool alloc_result(const struct keygen_scenario *scenario,
     }
 
     if (scenario->export_keys) {
-        result->public_keys = calloc(scenario->parameters.repetitions,
-                sizeof(TPMU_PUBLIC_ID));
-        if (result->public_keys == NULL) {
-            log_error("Keygen: (calloc) Cannot allocate memory for public keys.");
+        result->keypairs = calloc(scenario->parameters.repetitions,
+                sizeof(struct keygen_keypair));
+        if (result->keypairs == NULL) {
+            log_error("Keygen: (calloc) Cannot allocate memory for keypairs.");
             free(result->data_points);
-            return false;
-        }
-        result->private_keys = calloc(scenario->parameters.repetitions,
-                sizeof(TPMU_SENSITIVE_COMPOSITE));
-        if (result->private_keys == NULL) {
-            log_error("Keygen: (calloc) Cannot allocate memory for public keys.");
-            free(result->data_points);
-            free(result->public_keys);
             return false;
         }
     }
@@ -197,8 +199,7 @@ void free_result(const struct keygen_scenario *scenario,
 {
     free(result->data_points);
     if (scenario->export_keys) {
-        free(result->public_keys);
-        free(result->private_keys);
+        free(result->keypairs);
     }
 }
 
