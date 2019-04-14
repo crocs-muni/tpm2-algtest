@@ -12,6 +12,10 @@ TPM2B_PUBLIC prepare_template_SYMCIPHER_primary();
 TPM2B_PUBLIC prepare_template_RSA(TPMI_RSA_KEY_BITS keyBits);
 TPM2B_PUBLIC prepare_template_ECC(TPMI_ECC_CURVE curveID);
 
+TPM2B_PUBLIC prepare_template(const TPMT_PUBLIC_PARMS *parameters);
+
+TSS2L_SYS_AUTH_COMMAND prepare_session();
+
 TPM2_RC create_primary(
         TSS2_SYS_CONTEXT *sapi_context,
         const TPM2B_PUBLIC *inPublic,
@@ -33,6 +37,12 @@ TPM2_RC load(
         TPMI_DH_OBJECT parentHandle,
         const TPM2B_PRIVATE *inPrivate,
         const TPM2B_PUBLIC *inPublic,
+        TPM2_HANDLE *objectHandle);
+
+TPM2_RC create_loaded(
+        TSS2_SYS_CONTEXT *sapi_context,
+        const TPM2B_PUBLIC *inPublic,
+        TPMI_DH_OBJECT primary_handle,
         TPM2_HANDLE *objectHandle);
 
 TPM2_RC extract_sensitive(

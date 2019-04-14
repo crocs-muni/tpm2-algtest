@@ -28,8 +28,8 @@ struct keygen_result {
     struct keygen_keypair *keypairs;
 };
 
-bool test_keygen(TSS2_SYS_CONTEXT *sapi_context,
+void run_keygen(TSS2_SYS_CONTEXT *sapi_context,
         const struct keygen_scenario *scenario);
 
-void test_keygen_all(TSS2_SYS_CONTEXT *sapi_context,
+void run_keygen_all(TSS2_SYS_CONTEXT *sapi_context,
         const struct scenario_parameters *parameters);

@@ -42,8 +42,8 @@ void extract_keys(
  */
 bool test_detail(
         TSS2_SYS_CONTEXT *sapi_context,
-        TPMI_DH_OBJECT primary_handle,
         const struct keygen_scenario *scenario,
+        TPMI_DH_OBJECT primary_handle,
         struct keygen_result *result)
 {
     TPM2B_PUBLIC inPublic;
@@ -102,6 +102,7 @@ bool test_detail(
     return true;
 }
 
+static
 void output_results(const struct keygen_scenario *scenario,
         const struct keygen_result *result)
 {
@@ -172,6 +173,7 @@ void output_results(const struct keygen_scenario *scenario,
     }
 }
 
+static
 bool alloc_result(const struct keygen_scenario *scenario,
         struct keygen_result *result)
 {
@@ -194,6 +196,7 @@ bool alloc_result(const struct keygen_scenario *scenario,
     return true;
 }
 
+static
 void free_result(const struct keygen_scenario *scenario,
         struct keygen_result *result)
 {
@@ -203,23 +206,22 @@ void free_result(const struct keygen_scenario *scenario,
     }
 }
 
-bool test_keygen_on_primary(TSS2_SYS_CONTEXT *sapi_context,
+void run_keygen_on_primary(TSS2_SYS_CONTEXT *sapi_context,
         const struct keygen_scenario *scenario,
         TPMI_DH_OBJECT primary_handle)
 {
     struct keygen_result result;
 
     if (!alloc_result(scenario, &result)) {
-        return false;
+        return;
     }
 
-    bool ok = test_detail(sapi_context, primary_handle, scenario, &result);
+    bool ok = test_detail(sapi_context, scenario, primary_handle, &result);
     if (ok) {
         output_results(scenario, &result);
     }
 
     free_result(scenario, &result);
-    return ok;
 }
 
 bool create_primary_for_keygen(TSS2_SYS_CONTEXT *sapi_context,
@@ -233,22 +235,21 @@ bool create_primary_for_keygen(TSS2_SYS_CONTEXT *sapi_context,
     return rc == TPM2_RC_SUCCESS;
 }
 
-bool test_keygen(TSS2_SYS_CONTEXT *sapi_context,
+void run_keygen(TSS2_SYS_CONTEXT *sapi_context,
         const struct keygen_scenario *scenario)
 {
     TPMI_DH_OBJECT primary_handle;
     bool ok = create_primary_for_keygen(sapi_context, &primary_handle);
     if (!ok) {
-        return false;
+        return;
     }
     // TODO deal with incomplete scenario
-    ok = test_keygen_on_primary(sapi_context, scenario, primary_handle);
+    run_keygen_on_primary(sapi_context, scenario, primary_handle);
 
     Tss2_Sys_FlushContext(sapi_context, primary_handle);
-    return ok;
 }
 
-void test_keygen_all(TSS2_SYS_CONTEXT *sapi_context,
+void run_keygen_all(TSS2_SYS_CONTEXT *sapi_context,
         const struct scenario_parameters *parameters)
 {
     struct keygen_scenario scenario = {
@@ -267,14 +268,14 @@ void test_keygen_all(TSS2_SYS_CONTEXT *sapi_context,
     scenario.type = TPM2_ALG_RSA;
     for (TPMI_RSA_KEY_BITS keyBits = 0; keyBits <= 2048; keyBits += 32) {
         scenario.keyBits = keyBits;
-        test_keygen_on_primary(sapi_context, &scenario, primary_handle);
+        run_keygen_on_primary(sapi_context, &scenario, primary_handle);
     }
     scenario.keyBits = 0;
 
     scenario.type = TPM2_ALG_ECC;
     for (TPMI_ECC_CURVE curveID = 0x0000; curveID <= 0x0020; ++curveID) {
         scenario.curveID = curveID;
-        test_keygen_on_primary(sapi_context, &scenario, primary_handle);
+        run_keygen_on_primary(sapi_context, &scenario, primary_handle);
     }
 
     Tss2_Sys_FlushContext(sapi_context, primary_handle);
