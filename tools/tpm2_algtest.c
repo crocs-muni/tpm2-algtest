@@ -9,6 +9,7 @@
 #include "scenario.h"
 #include "logging.h"
 #include "keygen.h"
+#include "perf.h"
 
 #include "tpm2_tool.h"
 #include "tpm2_session.h"
@@ -30,6 +31,7 @@ struct tpm_algtest_options options = {
     .type = "all",
     .algorithm = "all",
     .keylen = 0,
+    .curveid = TPM2_ECC_NONE,
     .verbose = TPM2_ALGTEST_VERBOSE_INFO
 };
 
@@ -85,17 +87,6 @@ bool tpm2_tool_onstart(tpm2_options **opts)
     return *opts != NULL;
 }
 
-#if 0
-void run_all(TSS2_SYS_CONTEXT *sapi_context)
-{
-    test_CreatePrimary(sapi_context);
-    test_Create(sapi_context);
-    test_ECDH_KeyGen(sapi_context);
-    test_VerifySignature(sapi_context);
-    test_Sign(sapi_context);
-}
-#endif
-
 int tpm2_tool_onrun(TSS2_SYS_CONTEXT *sapi_context, tpm2_option_flags flags)
 {
 #if 0
@@ -119,18 +110,6 @@ int tpm2_tool_onrun(TSS2_SYS_CONTEXT *sapi_context, tpm2_option_flags flags)
         exit(1);
     }
 #endif
-#if 0
-    struct keygen_scenario scenario = {
-        .common = {
-            .repetitions = 10,
-            .max_duration_s = 0,
-        },
-        .type = TPM2_ALG_RSA,
-        .keyBits = 1024,
-        .output_keys = false,
-    };
-    test_keygen(sapi_context, &scenario);
-#endif
     struct scenario_parameters parameters = {
         .repetitions = options.repetitions,
         .max_duration_s = options.max_duration_s,
@@ -139,7 +118,7 @@ int tpm2_tool_onrun(TSS2_SYS_CONTEXT *sapi_context, tpm2_option_flags flags)
 
     if (strcmp(options.scenario, "keygen") == 0) {
         if (strcmp(options.type, "all") == 0) {
-            test_keygen_all(sapi_context, &parameters);
+            run_keygen_all(sapi_context, &parameters);
         } else {
             struct keygen_scenario scenario = {
                 .parameters = parameters,
@@ -152,8 +131,10 @@ int tpm2_tool_onrun(TSS2_SYS_CONTEXT *sapi_context, tpm2_option_flags flags)
                 scenario.type = TPM2_ALG_ECC;
                 scenario.curveID = options.curveid;
             }
-            test_keygen(sapi_context, &scenario);
+            run_keygen(sapi_context, &scenario);
         }
+    } else if (strcmp(options.scenario, "perf") == 0) {
+        run_perf_scenarios(sapi_context, &parameters);
     }
     return 0;
 }

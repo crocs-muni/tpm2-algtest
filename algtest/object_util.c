@@ -145,6 +145,23 @@ TPM2B_PUBLIC prepare_template_RSA(TPMI_RSA_KEY_BITS keyBits)
     };
 }
 
+TPM2B_PUBLIC prepare_template(const TPMT_PUBLIC_PARMS *parameters)
+{
+    return (TPM2B_PUBLIC) {
+        .size = 0,
+        .publicArea = {
+            .type = parameters->type,
+            .nameAlg = TPM2_ALG_SHA256,
+            .objectAttributes =
+                TPMA_OBJECT_SIGN_ENCRYPT
+                | TPMA_OBJECT_SENSITIVEDATAORIGIN
+                | TPMA_OBJECT_USERWITHAUTH,
+            .authPolicy = { .size = 0 },
+            .parameters = parameters->parameters
+        }
+    };
+}
+
 TPM2B_PUBLIC prepare_template_ECC(TPMI_ECC_CURVE curveID)
 {
     return (TPM2B_PUBLIC) {
@@ -336,7 +353,6 @@ TPM2_RC create(
     if (duration != NULL) {
         *duration = get_duration_s(&start, &end);
     }
-
     return rc;
 }
 
@@ -352,6 +368,26 @@ TPM2_RC load(
     TSS2L_SYS_AUTH_RESPONSE rspAuthsArray;
     TPM2_RC rc = Tss2_Sys_Load(sapi_context, parentHandle, &cmdAuthsArray,
             inPrivate, inPublic, objectHandle, &name, &rspAuthsArray);
+    return rc;
+}
+
+TPM2_RC create_loaded(
+        TSS2_SYS_CONTEXT *sapi_context,
+        const TPM2B_PUBLIC *inPublic,
+        TPMI_DH_OBJECT primary_handle,
+        TPM2_HANDLE *objectHandle)
+{
+    TPM2B_PUBLIC outPublic = { .size = 0 };
+    TPM2B_PRIVATE outPrivate = { .size = 0 };
+
+    TPM2_RC rc = create(sapi_context, inPublic, primary_handle,
+            &outPublic, &outPrivate, NULL);
+
+    if (rc != TPM2_RC_SUCCESS) {
+        return rc;
+    }
+
+    rc = load(sapi_context, primary_handle, &outPrivate, &outPublic, objectHandle);
     return rc;
 }
 

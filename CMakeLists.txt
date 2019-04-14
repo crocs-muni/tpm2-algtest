@@ -31,9 +31,13 @@ set(SOURCES
     ${TOOLS_SRC}/tpm2_algtest.c
     ${ALGTEST_SRC}/util.c
     ${ALGTEST_SRC}/logging.c
+    ${ALGTEST_SRC}/options.c
+    ${ALGTEST_SRC}/key_params_generator.c
     ${ALGTEST_SRC}/scenario.c
     ${ALGTEST_SRC}/keygen.c
+    ${ALGTEST_SRC}/perf.c
     ${ALGTEST_SRC}/object_util.c
+    ${ALGTEST_SRC}/perf_util.c
     #${ALGTEST_SRC}/createprimary.c
     #${ALGTEST_SRC}/create.c
     #${ALGTEST_SRC}/createloaded.c
