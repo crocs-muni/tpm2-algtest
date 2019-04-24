@@ -60,6 +60,7 @@ bool test_detail(
     }
 
     if (scenario->export_keys) {
+        // TODO: create it only once and reuse
         inPublic.publicArea.authPolicy = create_dup_policy(sapi_context);
     }
 

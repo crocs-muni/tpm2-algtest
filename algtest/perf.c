@@ -86,12 +86,16 @@ void output_results(
         const struct perf_result *result)
 {
     char filename[256];
-    bool fn_valid;
+    bool fn_valid = true;
     switch (scenario->command_code) {
     case TPM2_CC_Sign:
         fn_valid = get_csv_filename_sign(&scenario->sign, filename); break;
     case TPM2_CC_VerifySignature:
         fn_valid = get_csv_filename_verifysignature(&scenario->verifysignature, filename); break;
+    case TPM2_CC_RSA_Encrypt:
+        snprintf(filename, 256, "Perf_RSA_Encrypt_%d.csv", scenario->rsa_encrypt.keylen); break;
+    case TPM2_CC_RSA_Decrypt:
+        snprintf(filename, 256, "Perf_RSA_Decrypt_%d.csv", scenario->rsa_decrypt.keylen); break;
     default:
         log_error("Perf: (output_results) Command not supported.");
         return;
@@ -221,6 +225,95 @@ bool run_perf_verifysignature(
     return true;
 }
 
+bool run_perf_rsa_encrypt(
+        TSS2_SYS_CONTEXT* sapi_context,
+        const struct perf_scenario *scenario,
+        TPMI_DH_OBJECT primary_handle,
+        struct perf_result *result)
+{
+    TPM2B_PUBLIC inPublic = prepare_template_RSA(scenario->rsa_encrypt.keylen);
+    TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
+    if (rc != TPM2_RC_SUCCESS) {
+        return false;
+    }
+
+    TPM2_HANDLE object_handle;
+    log_info("Perf rsa_encrypt: Generating encryption key...");
+    rc = create_loaded(sapi_context, &inPublic, primary_handle, &object_handle);
+    if (rc != TPM2_RC_SUCCESS) {
+        log_error("Perf rsa_encrypt: Error when creating encryption key %04x", rc);
+        return false;
+    }
+
+    result->size = 0;
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    for (unsigned i = 0; i < scenario->parameters.repetitions; ++i) {
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        if (get_duration_s(&start, &end) > scenario->parameters.max_duration_s) {
+            break;
+        }
+
+        TPM2B_PUBLIC_KEY_RSA outData;
+        result->data_points[i].rc = rsa_encrypt(sapi_context, object_handle,
+                &scenario->rsa_encrypt.message, &outData,
+                &result->data_points[i].duration_s);
+        ++result->size;
+        log_info("Perf rsa_encrypt: %d: keybits %d | duration %f | rc %04x",
+                i, scenario->rsa_encrypt.keylen, result->data_points[i].duration_s,
+                result->data_points[i].rc);
+    }
+    Tss2_Sys_FlushContext(sapi_context, object_handle);
+    return true;
+}
+
+bool run_perf_rsa_decrypt(
+        TSS2_SYS_CONTEXT* sapi_context,
+        const struct perf_scenario *scenario,
+        TPMI_DH_OBJECT primary_handle,
+        struct perf_result *result)
+{
+    TPM2B_PUBLIC inPublic = prepare_template_RSA(scenario->rsa_decrypt.keylen);
+    TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
+    if (rc != TPM2_RC_SUCCESS) {
+        return false;
+    }
+
+    TPM2_HANDLE object_handle;
+    log_info("Perf rsa_decrypt: Generating encryption key...");
+    rc = create_loaded(sapi_context, &inPublic, primary_handle, &object_handle);
+    if (rc != TPM2_RC_SUCCESS) {
+        log_error("Perf rsa_decrypt: Error when creating encryption key %04x", rc);
+        return false;
+    }
+
+    TPM2B_PUBLIC_KEY_RSA ciphertext = { .size = scenario->rsa_decrypt.keylen / 8 };
+    memset(&ciphertext.buffer, 0x00, ciphertext.size);
+
+    result->size = 0;
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    for (unsigned i = 0; i < scenario->parameters.repetitions; ++i) {
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        if (get_duration_s(&start, &end) > scenario->parameters.max_duration_s) {
+            break;
+        }
+
+        TPM2B_PUBLIC_KEY_RSA decrypted_message;
+        result->data_points[i].rc = rsa_decrypt(sapi_context, object_handle,
+                &ciphertext, &decrypted_message,
+                &result->data_points[i].duration_s);
+        ++result->size;
+        log_info("Perf rsa_decrypt: %d: keybits %d | duration %f | rc %04x",
+                i, scenario->rsa_decrypt.keylen, result->data_points[i].duration_s,
+                result->data_points[i].rc);
+    }
+    Tss2_Sys_FlushContext(sapi_context, object_handle);
+    return true;
+}
+
 void run_perf_on_primary(
         TSS2_SYS_CONTEXT *sapi_context,
         const struct perf_scenario *scenario,
@@ -239,6 +332,12 @@ void run_perf_on_primary(
         break;
     case TPM2_CC_VerifySignature:
         ok = run_perf_verifysignature(sapi_context, scenario, primary_handle, &result);
+        break;
+    case TPM2_CC_RSA_Encrypt:
+        ok = run_perf_rsa_encrypt(sapi_context, scenario, primary_handle, &result);
+        break;
+    case TPM2_CC_RSA_Decrypt:
+        ok = run_perf_rsa_decrypt(sapi_context, scenario, primary_handle, &result);
         break;
     default:
         log_warning("Perf: unsupported command code %04x", scenario->command_code);
@@ -305,10 +404,29 @@ void run_perf_scenarios(
         }
     }
 
-#if 0
-    if (command_in_options("encryptdecrypt")) {
+    if (command_in_options("rsa_encrypt")) {
+        scenario.command_code = TPM2_CC_RSA_Encrypt;
+        scenario.rsa_encrypt = (struct perf_rsa_encrypt_scenario) {
+            .keylen = 0,
+            .message = { .size = 64 },
+        };
+        memset(&scenario.rsa_encrypt.message.buffer, 0x00, scenario.rsa_encrypt.message.size);
+        while (get_next_rsa_keylen(&scenario.rsa_encrypt.keylen)) {
+            run_perf_on_primary(sapi_context, &scenario, primary_handle);
+        }
     }
-#endif
+
+    if (command_in_options("rsa_decrypt")) {
+        scenario.command_code = TPM2_CC_RSA_Decrypt;
+        scenario.rsa_decrypt = (struct perf_rsa_decrypt_scenario) {
+            .keylen = 0,
+            .ciphertext = { .size = 64 },
+        };
+        memset(&scenario.rsa_decrypt.ciphertext.buffer, 0x00, scenario.rsa_decrypt.ciphertext.size);
+        while (get_next_rsa_keylen(&scenario.rsa_decrypt.keylen)) {
+            run_perf_on_primary(sapi_context, &scenario, primary_handle);
+        }
+    }
 
     Tss2_Sys_FlushContext(sapi_context, primary_handle);
 }

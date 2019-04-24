@@ -14,13 +14,24 @@ struct perf_verifysignature_scenario {
     TPM2B_DIGEST digest;
 };
 
+struct perf_rsa_encrypt_scenario {
+    TPMI_RSA_KEY_BITS keylen;
+    TPM2B_PUBLIC_KEY_RSA message;
+};
+
+struct perf_rsa_decrypt_scenario {
+    TPMI_RSA_KEY_BITS keylen;
+    TPM2B_PUBLIC_KEY_RSA ciphertext;
+};
+
 struct perf_scenario {
     struct scenario_parameters parameters;
     TPM2_CC command_code;
     union {
         struct perf_sign_scenario sign;
         struct perf_verifysignature_scenario verifysignature;
-        //struct perf_encryptdecrypt_scenario encryptdecrypt;
+        struct perf_rsa_encrypt_scenario rsa_encrypt;
+        struct perf_rsa_decrypt_scenario rsa_decrypt;
     };
 };
 
