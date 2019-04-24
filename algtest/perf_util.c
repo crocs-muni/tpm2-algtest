@@ -61,3 +61,57 @@ TPM2_RC verifysignature(
     return rc;
 }
 
+TPM2_RC rsa_encrypt(
+        TSS2_SYS_CONTEXT *sapi_context,
+        TPMI_DH_OBJECT keyHandle,
+        const TPM2B_PUBLIC_KEY_RSA *message,
+        TPM2B_PUBLIC_KEY_RSA *outData,
+        double *duration)
+{
+    /* Cmd parameters */
+    TPMT_RSA_DECRYPT inScheme = { .scheme = TPM2_ALG_NULL };
+    TPM2B_DATA label = { .size = 0 };
+
+    /* Rsp parameters */
+    TSS2L_SYS_AUTH_RESPONSE rspAuthsArray;
+
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    TPM2_RC rc = Tss2_Sys_RSA_Encrypt(sapi_context, keyHandle, NULL,
+            message, &inScheme, &label, outData, &rspAuthsArray);
+
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    if (duration != NULL) {
+        *duration = get_duration_s(&start, &end);
+    }
+    return rc;
+}
+
+TPM2_RC rsa_decrypt(
+        TSS2_SYS_CONTEXT *sapi_context,
+        TPMI_DH_OBJECT keyHandle,
+        const TPM2B_PUBLIC_KEY_RSA *cipherText,
+        TPM2B_PUBLIC_KEY_RSA *message,
+        double *duration)
+{
+    /* Cmd parameters */
+    TSS2L_SYS_AUTH_COMMAND cmdAuthsArray = prepare_session();
+    TPMT_RSA_DECRYPT inScheme = { .scheme = TPM2_ALG_NULL };
+    TPM2B_DATA label = { .size = 0 };
+
+    /* Rsp parameters */
+    TSS2L_SYS_AUTH_RESPONSE rspAuthsArray;
+
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    TPM2_RC rc = Tss2_Sys_RSA_Decrypt(sapi_context, keyHandle, &cmdAuthsArray,
+            cipherText, &inScheme, &label, message, &rspAuthsArray);
+
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    if (duration != NULL) {
+        *duration = get_duration_s(&start, &end);
+    }
+    return rc;
+}
