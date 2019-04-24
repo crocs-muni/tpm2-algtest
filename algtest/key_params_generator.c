@@ -3,29 +3,29 @@
 
 extern struct tpm_algtest_options options;
 
-bool get_next_rsa_keylen(TPMT_PUBLIC_PARMS* key_params)
+bool get_next_rsa_keylen(TPMI_RSA_KEY_BITS *keylen)
 {
-    while (key_params->parameters.rsaDetail.keyBits <= 4096) {
-        key_params->parameters.rsaDetail.keyBits += 32;
-        if (keylen_in_options(key_params->parameters.rsaDetail.keyBits)) {
+    while (*keylen <= 4096) {
+        *keylen += 32;
+        if (keylen_in_options(*keylen)) {
             return true;
         }
     }
     return false;
 }
 
-bool get_next_ecc_curve(TPMT_PUBLIC_PARMS* key_params)
+bool get_next_ecc_curve(TPMI_ECC_CURVE *curve)
 {
-    while (key_params->parameters.eccDetail.curveID <= 0x0020) {
-        ++key_params->parameters.eccDetail.curveID;
-        if (curve_in_options(key_params->parameters.eccDetail.curveID)) {
+    while (*curve <= 0x0020) {
+        ++(*curve);
+        if (curve_in_options(*curve)) {
             return true;
         }
     }
     return false;
 }
 
-// TODO: at the moment this is sign specific
+// TODO: at the moment this is sign specific - move scheme to sign()
 bool get_next_key_type(TPMT_PUBLIC_PARMS *key_params) {
     switch (key_params->type) {
     case TPM2_ALG_NULL:
@@ -69,13 +69,13 @@ bool get_next_key_params(TPMT_PUBLIC_PARMS *key_params)
     case TPM2_ALG_NULL:
         return get_next_key_type(key_params);
     case TPM2_ALG_RSA:
-        if (get_next_rsa_keylen(key_params)) {
+        if (get_next_rsa_keylen(&key_params->parameters.rsaDetail.keyBits)) {
             return true;
         } else {
             return get_next_key_type(key_params);
         }
     case TPM2_ALG_ECC:
-        if (get_next_ecc_curve(key_params)) {
+        if (get_next_ecc_curve(&key_params->parameters.eccDetail.curveID)) {
             return true;
         } else {
             return get_next_key_type(key_params);
