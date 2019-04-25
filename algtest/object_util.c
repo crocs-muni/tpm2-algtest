@@ -89,6 +89,8 @@ TPM2B_DIGEST create_dup_policy(TSS2_SYS_CONTEXT *sapi_context)
     TPMI_ALG_HASH authHash =  TPM2_ALG_SHA256;
     TPM2B_NONCE nonceTPM = { .size = 0 };
     TPMI_SH_AUTH_SESSION sessionHandle;
+
+    log_info("Creating DUP policy");
     TPM2_RC rc = Tss2_Sys_StartAuthSession(sapi_context, tpmKey, bind, NULL,
             &nonceCaller, &encryptedSalt, sessionType, &symmetric, authHash,
             &sessionHandle, &nonceTPM, NULL);
@@ -107,6 +109,15 @@ TPM2B_DIGEST create_dup_policy(TSS2_SYS_CONTEXT *sapi_context)
     }
     Tss2_Sys_FlushContext(sapi_context, sessionHandle);
     return authPolicy;
+}
+
+TPM2B_DIGEST get_dup_policy(TSS2_SYS_CONTEXT *sapi_context)
+{
+    static TPM2B_DIGEST dup_policy = { .size = 0 };
+    if (dup_policy.size == 0) {
+        dup_policy = create_dup_policy(sapi_context);
+    }
+    return dup_policy;
 }
 
 TPM2B_SENSITIVE_CREATE prepare_null_authorization()

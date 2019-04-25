@@ -50,4 +50,4 @@ TPM2_RC extract_sensitive(
         TPMI_DH_OBJECT objectHandle,
         TPMU_SENSITIVE_COMPOSITE *sensitive);
 
-TPM2B_DIGEST create_dup_policy(TSS2_SYS_CONTEXT *sapi_context);
+TPM2B_DIGEST get_dup_policy(TSS2_SYS_CONTEXT *sapi_context);
