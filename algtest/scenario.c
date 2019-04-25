@@ -1,12 +1,14 @@
 #include "scenario.h"
+#include "options.h"
 
-void set_default_parameters(struct scenario_parameters *parameters,
-        unsigned repetitions, unsigned max_duration_s)
+extern struct tpm_algtest_options options;
+
+void set_parameters_from_options(struct scenario_parameters *parameters)
 {
-    if (!parameters->repetitions) {
-        parameters->repetitions = repetitions;
+    if (options.repetitions) {
+        parameters->repetitions = options.repetitions;
     }
-    if (!parameters->max_duration_s) {
-        parameters->max_duration_s = max_duration_s;
+    if (options.max_duration_s) {
+        parameters->max_duration_s = options.max_duration_s;
     }
 }

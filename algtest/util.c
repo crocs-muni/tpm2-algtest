@@ -95,9 +95,9 @@ void fill_error_codes_string(char *error_codes_string, struct rc_array *error_co
 
 FILE *open_csv(const char *filename, const char *header)
 {
+    umask(0000);
     struct stat sb;
     if (stat("out", &sb) == -1) {
-        umask(0000);
         mkdir("out", 0777);
     }
 

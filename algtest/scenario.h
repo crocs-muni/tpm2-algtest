@@ -7,5 +7,4 @@ struct scenario_parameters {
     unsigned max_duration_s;
 };
 
-void set_default_parameters(struct scenario_parameters *parameters,
-        unsigned repetitions, unsigned max_duration_s);
+void set_parameters_from_options(struct scenario_parameters *parameters);
