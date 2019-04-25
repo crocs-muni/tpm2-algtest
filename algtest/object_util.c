@@ -225,48 +225,6 @@ TPM2B_PUBLIC prepare_template_ECC_primary(TPMI_ECC_CURVE curveID)
     };
     return public;
 }
-#if 0
-void prepare_create_params(struct create_params *params)
-{
-    params->cmdAuthsArray = prepare_session();
-    params->inSensitive = prepare_null_authorization();
-    params->outsideInfo.size = 0;
-    params->creationPCR.count = 0;
-
-    TPM2B_PUBLIC inPublic = {
-        .size = 0,
-        .publicArea = {                         // TPMT_PUBLIC
-            .nameAlg = TPM2_ALG_SHA256,             // TPMI_ALG_HASH
-            .objectAttributes =                     // TPMA_OBJECT
-                TPMA_OBJECT_SIGN_ENCRYPT | TPMA_OBJECT_DECRYPT
-                | TPMA_OBJECT_FIXEDTPM | TPMA_OBJECT_FIXEDPARENT
-                | TPMA_OBJECT_SENSITIVEDATAORIGIN | TPMA_OBJECT_USERWITHAUTH,
-            .authPolicy = { .size = 0, /* buffer */ }, // TPM2B_DIGEST
-        }
-    };
-    params->inPublic = inPublic;
-}
-#endif
-#if 0
-void prepare_create_primary_params(struct create_params *params,
-        TPMA_OBJECT objectAttributes)
-{
-    params->cmdAuthsArray = prepare_session();
-    params->inSensitive = prepare_null_authorization();
-    params->outsideInfo.size = 0;
-    params->creationPCR.count = 0;
-
-    TPM2B_PUBLIC inPublic = {
-        .size = 0, // doesn't need to be set
-        .publicArea = {                         // TPMT_PUBLIC
-            .nameAlg = TPM2_ALG_SHA256,             // TPMI_ALG_HASH
-            .objectAttributes = objectAttributes,
-            .authPolicy = { .size = 0, /* buffer */ }, // TPM2B_DIGEST
-        }
-    };
-    params->inPublic = inPublic;
-}
-#endif
 
 TPM2_RC create_some_primary(TSS2_SYS_CONTEXT *sapi_context,
         TPMI_DH_OBJECT *primary_handle)

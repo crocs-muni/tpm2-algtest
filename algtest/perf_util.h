@@ -4,6 +4,7 @@
 TPM2_RC sign(
         TSS2_SYS_CONTEXT *sapi_context,
         TPMI_DH_OBJECT keyHandle,
+        const TPMT_SIG_SCHEME *inScheme,
         const TPM2B_DIGEST *digest,
         TPMT_SIGNATURE *signature,
         double *duration);
@@ -28,3 +29,5 @@ TPM2_RC rsa_decrypt(
         const TPM2B_PUBLIC_KEY_RSA *cipherText,
         TPM2B_PUBLIC_KEY_RSA *message,
         double *duration);
+
+TPMT_SIG_SCHEME get_sign_scheme(TPM2_ALG_ID type);

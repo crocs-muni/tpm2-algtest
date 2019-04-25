@@ -2,6 +2,7 @@
 #include "options.h"
 #include "logging.h"
 #include "object_util.h"
+#include "key_params_generator.h"
 #include "util.h"
 
 #include <tss2/tss2_sys.h>
@@ -46,20 +47,9 @@ bool test_detail(
         TPMI_DH_OBJECT primary_handle,
         struct keygen_result *result)
 {
-    TPM2B_PUBLIC inPublic;
-    switch (scenario->type) {
-    case TPM2_ALG_RSA:
-        inPublic = prepare_template_RSA(scenario->keyBits);
-        break;
-    case TPM2_ALG_ECC:
-        inPublic = prepare_template_ECC(scenario->curveID);
-        break;
-    default:
-        log_error("Keygen: algorithm type not supported!");
-        return false;
-    }
+    TPM2B_PUBLIC inPublic = prepare_template(&scenario->key_params);
 
-    if (scenario->export_keys) {
+    if (!scenario->no_export) {
         inPublic.publicArea.authPolicy = get_dup_policy(sapi_context);
     }
 
@@ -72,7 +62,6 @@ bool test_detail(
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
     for (unsigned i = 0; i < scenario->parameters.repetitions; ++i) {
-
         clock_gettime(CLOCK_MONOTONIC, &end);
         if (get_duration_s(&start, &end) > scenario->parameters.max_duration_s) {
             break;
@@ -86,15 +75,23 @@ bool test_detail(
                 &result->data_points[i].duration_s);
 
         ++result->size;
-        log_info("Keygen %d: type %04x | keybits %d | curve %04x | duration %f | rc %04x",
-                i, scenario->type, scenario->keyBits, scenario->curveID,
-                result->data_points[i].duration_s, result->data_points[i].rc);
+        switch (scenario->key_params.type) {
+        case TPM2_ALG_RSA:
+            log_info("Keygen %d: RSA | keybits %d | duration %f | rc %04x",
+                    i, scenario->key_params.parameters.rsaDetail.keyBits,
+                    result->data_points[i].duration_s, result->data_points[i].rc);
+            break;
+        case TPM2_ALG_ECC:
+            log_info("Keygen %d: ECC | curve %04x | duration %f | rc %04x",
+                    i, scenario->key_params.parameters.eccDetail.curveID,
+                    result->data_points[i].duration_s, result->data_points[i].rc);
+        }
 
         if (result->data_points[i].rc != TPM2_RC_SUCCESS) {
             continue;
         }
 
-        if (scenario->export_keys) {
+        if (!scenario->no_export) {
             extract_keys(sapi_context, primary_handle, &outPublic, &outPrivate,
                     &result->keypairs[i]);
         }
@@ -103,22 +100,27 @@ bool test_detail(
 }
 
 static
-void output_results(const struct keygen_scenario *scenario,
+void output_results(
+        const struct keygen_scenario *scenario,
         const struct keygen_result *result)
 {
     char filename[256];
     char filename_keys[256];
-    switch (scenario->type) {
+    switch (scenario->key_params.type) {
     case TPM2_ALG_RSA:
-        snprintf(filename, 256, "Keygen_RSA_%d.csv", scenario->keyBits);
-        snprintf(filename_keys, 256, "Keygen_RSA_%d_keys.csv", scenario->keyBits);
+        snprintf(filename, 256, "Keygen_RSA_%d.csv",
+                scenario->key_params.parameters.rsaDetail.keyBits);
+        snprintf(filename_keys, 256, "Keygen_RSA_%d_keys.csv",
+                scenario->key_params.parameters.rsaDetail.keyBits);
         break;
     case TPM2_ALG_ECC:
-        snprintf(filename, 256, "Keygen_ECC_0x%04x.csv", scenario->curveID);
-        snprintf(filename_keys, 256, "Keygen_ECC_0x%04x_keys.csv", scenario->curveID);
+        snprintf(filename, 256, "Keygen_ECC_0x%04x.csv",
+                scenario->key_params.parameters.eccDetail.curveID);
+        snprintf(filename_keys, 256, "Keygen_ECC_0x%04x_keys.csv",
+                scenario->key_params.parameters.eccDetail.curveID);
         break;
     default:
-        log_error("Keygen: (output_results) Algorithm type not supported.");
+        log_error("Keygen: (output_results) Key type not supported.");
         return;
     }
 
@@ -129,52 +131,59 @@ void output_results(const struct keygen_scenario *scenario,
     }
     fclose(out);
 
-    if (scenario->export_keys) {
-        if (scenario->type == TPM2_ALG_RSA) {
-            out = open_csv(filename_keys, "id;n;e;p;q;d;t");
-            for (int i = 0; i < result->size; ++i) {
-                if (result->data_points[i].rc != TPM2_RC_SUCCESS) {
-                    fprintf(out, "null;null;null;null;null;null;null\n");
-                    continue;
-                }
-                fprintf(out, "%d;", i);
-                for (int j = 0; j < result->keypairs[i].public_key.rsa.size; ++j) {
-                    fprintf(out, "%02X", result->keypairs[i].public_key.rsa.buffer[j]);
-                }
-                fprintf(out, ";010001;");
-                for (int j = 0; j < result->keypairs[i].private_key.rsa.size; ++j) {
-                    fprintf(out, "%02X", result->keypairs[i].private_key.rsa.buffer[j]);
-                }
-                fprintf(out, "; ; ;%d\n", (int) (result->data_points[i].duration_s * 1000));
-            }
+    if (scenario->no_export) {
+        return;
+    }
 
-        } else if (scenario->type == TPM2_ALG_ECC) {
-            out = open_csv(filename_keys, "id;x;y;private;t");
-            for (int i = 0; i < result->size; ++i) {
-                if (result->data_points[i].rc != TPM2_RC_SUCCESS) {
-                    fprintf(out, "null;null;null;null;null;null;null\n");
-                    continue;
-                }
-                fprintf(out, "%d;", i);
-                for (int j = 0; j < result->keypairs[i].public_key.ecc.x.size; ++j) {
-                    fprintf(out, "%02X", result->keypairs[i].public_key.ecc.x.buffer[j]);
-                }
-                fprintf(out, ";");
-                for (int j = 0; j < result->keypairs[i].public_key.ecc.y.size; ++j) {
-                    fprintf(out, "%02X", result->keypairs[i].public_key.ecc.y.buffer[j]);
-                }
-                fprintf(out, ";");
-                for (int j = 0; j < result->keypairs[i].private_key.ecc.size; ++j) {
-                    fprintf(out, "%02X", result->keypairs[i].private_key.ecc.buffer[j]);
-                }
-                fprintf(out, ";%d\n", (int) (result->data_points[i].duration_s * 1000));
+    switch (scenario->key_params.type) {
+    case TPM2_ALG_RSA:
+        out = open_csv(filename_keys, "id;n;e;p;q;d;t");
+        for (int i = 0; i < result->size; ++i) {
+            if (result->data_points[i].rc != TPM2_RC_SUCCESS) {
+                fprintf(out, "null;null;null;null;null;null;null\n");
+                continue;
             }
+            fprintf(out, "%d;", i);
+            for (int j = 0; j < result->keypairs[i].public_key.rsa.size; ++j) {
+                fprintf(out, "%02X", result->keypairs[i].public_key.rsa.buffer[j]);
+            }
+            fprintf(out, ";010001;");
+            for (int j = 0; j < result->keypairs[i].private_key.rsa.size; ++j) {
+                fprintf(out, "%02X", result->keypairs[i].private_key.rsa.buffer[j]);
+            }
+            fprintf(out, "; ; ;%d\n", (int) (result->data_points[i].duration_s * 1000));
         }
+        break;
+    case TPM2_ALG_ECC:
+        out = open_csv(filename_keys, "id;x;y;private;t");
+        for (int i = 0; i < result->size; ++i) {
+            if (result->data_points[i].rc != TPM2_RC_SUCCESS) {
+                fprintf(out, "null;null;null;null;null;null;null\n");
+                continue;
+            }
+            fprintf(out, "%d;", i);
+            for (int j = 0; j < result->keypairs[i].public_key.ecc.x.size; ++j) {
+                fprintf(out, "%02X", result->keypairs[i].public_key.ecc.x.buffer[j]);
+            }
+            fprintf(out, ";");
+            for (int j = 0; j < result->keypairs[i].public_key.ecc.y.size; ++j) {
+                fprintf(out, "%02X", result->keypairs[i].public_key.ecc.y.buffer[j]);
+            }
+            fprintf(out, ";");
+            for (int j = 0; j < result->keypairs[i].private_key.ecc.size; ++j) {
+                fprintf(out, "%02X", result->keypairs[i].private_key.ecc.buffer[j]);
+            }
+            fprintf(out, ";%d\n", (int) (result->data_points[i].duration_s * 1000));
+        }
+        break;
+    default:
+        log_error("Keygen (output_results) Key type not supported.");
     }
 }
 
 static
-bool alloc_result(const struct keygen_scenario *scenario,
+bool alloc_result(
+        const struct keygen_scenario *scenario,
         struct keygen_result *result)
 {
     result->data_points = calloc(scenario->parameters.repetitions,
@@ -184,7 +193,7 @@ bool alloc_result(const struct keygen_scenario *scenario,
         return false;
     }
 
-    if (scenario->export_keys) {
+    if (!scenario->no_export) {
         result->keypairs = calloc(scenario->parameters.repetitions,
                 sizeof(struct keygen_keypair));
         if (result->keypairs == NULL) {
@@ -197,16 +206,18 @@ bool alloc_result(const struct keygen_scenario *scenario,
 }
 
 static
-void free_result(const struct keygen_scenario *scenario,
+void free_result(
+        const struct keygen_scenario *scenario,
         struct keygen_result *result)
 {
     free(result->data_points);
-    if (scenario->export_keys) {
+    if (!scenario->no_export) {
         free(result->keypairs);
     }
 }
 
-void run_keygen_on_primary(TSS2_SYS_CONTEXT *sapi_context,
+void run_keygen_on_primary(
+        TSS2_SYS_CONTEXT *sapi_context,
         const struct keygen_scenario *scenario,
         TPMI_DH_OBJECT primary_handle)
 {
@@ -224,57 +235,27 @@ void run_keygen_on_primary(TSS2_SYS_CONTEXT *sapi_context,
     free_result(scenario, &result);
 }
 
-bool create_primary_for_keygen(TSS2_SYS_CONTEXT *sapi_context,
-        TPMI_DH_OBJECT *primary_handle)
-{
-    log_info("Keygen: creating primary...");
-    TPM2_RC rc = create_some_primary(sapi_context, primary_handle);
-    if (rc == TPM2_RC_SUCCESS) {
-        log_info("Created primary object with handle %08x", *primary_handle);
-    }
-    return rc == TPM2_RC_SUCCESS;
-}
-
-void run_keygen(TSS2_SYS_CONTEXT *sapi_context,
-        const struct keygen_scenario *scenario)
-{
-    TPMI_DH_OBJECT primary_handle;
-    bool ok = create_primary_for_keygen(sapi_context, &primary_handle);
-    if (!ok) {
-        return;
-    }
-    // TODO deal with incomplete scenario
-    run_keygen_on_primary(sapi_context, scenario, primary_handle);
-
-    Tss2_Sys_FlushContext(sapi_context, primary_handle);
-}
-
-void run_keygen_all(TSS2_SYS_CONTEXT *sapi_context,
+void run_keygen_scenarios(
+        TSS2_SYS_CONTEXT *sapi_context,
         const struct scenario_parameters *parameters)
 {
     struct keygen_scenario scenario = {
         .parameters = *parameters,
-        .keyBits = 0,
-        .curveID = 0x0000,
-        .export_keys = options.export_keys,
+        .key_params = { .type = TPM2_ALG_NULL },
+        .no_export = options.no_export,
     };
 
     TPMI_DH_OBJECT primary_handle;
-    bool ok = create_primary_for_keygen(sapi_context, &primary_handle);
-    if (!ok) {
+    log_info("Keygen: Creating primary key...");
+    TPM2_RC rc = create_some_primary(sapi_context, &primary_handle);
+    if (rc != TPM2_RC_SUCCESS) {
+        log_error("Keygen: Failed to create primary key!");
         return;
+    } else {
+        log_info("Keygen: Created primary key with handle %08x", primary_handle);
     }
 
-    scenario.type = TPM2_ALG_RSA;
-    for (TPMI_RSA_KEY_BITS keyBits = 0; keyBits <= 2048; keyBits += 32) {
-        scenario.keyBits = keyBits;
-        run_keygen_on_primary(sapi_context, &scenario, primary_handle);
-    }
-    scenario.keyBits = 0;
-
-    scenario.type = TPM2_ALG_ECC;
-    for (TPMI_ECC_CURVE curveID = 0x0000; curveID <= 0x0020; ++curveID) {
-        scenario.curveID = curveID;
+    while (get_next_key_params(&scenario.key_params)) {
         run_keygen_on_primary(sapi_context, &scenario, primary_handle);
     }
 

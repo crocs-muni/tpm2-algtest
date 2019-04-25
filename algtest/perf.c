@@ -9,18 +9,6 @@
 #include <stdlib.h>
 #include <time.h>
 
-bool create_primary_for_perf(
-        TSS2_SYS_CONTEXT *sapi_context,
-        TPMI_DH_OBJECT *primary_handle)
-{
-    log_info("Perf: creating primary...");
-    TPM2_RC rc = create_some_primary(sapi_context, primary_handle);
-    if (rc == TPM2_RC_SUCCESS) {
-        log_info("Created primary object with handle %08x", *primary_handle);
-    }
-    return rc == TPM2_RC_SUCCESS;
-}
-
 static
 bool alloc_result(
         const struct perf_scenario *scenario,
@@ -117,6 +105,7 @@ bool run_perf_sign(
         struct perf_result *result)
 {
     TPM2B_PUBLIC inPublic = prepare_template(&scenario->sign.key_params);
+    TPMT_SIG_SCHEME inScheme = get_sign_scheme(scenario->sign.key_params.type);
 
     TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
     if (rc != TPM2_RC_SUCCESS) {
@@ -141,7 +130,7 @@ bool run_perf_sign(
         }
 
         TPMT_SIGNATURE signature;
-        result->data_points[i].rc = sign(sapi_context, object_handle,
+        result->data_points[i].rc = sign(sapi_context, object_handle, &inScheme,
                 &scenario->sign.digest, &signature,
                 &result->data_points[i].duration_s);
 
@@ -151,7 +140,7 @@ bool run_perf_sign(
             log_info("Perf sign %d: RSA | keybits %d | duration %f | rc %04x",
                     i, scenario->sign.key_params.parameters.rsaDetail.keyBits,
                     result->data_points[i].duration_s, result->data_points[i].rc);
-                    break;
+            break;
         case TPM2_ALG_ECC:
             log_info("Perf sign %d: ECC | curve %04x | duration %f | rc %04x",
                     i, scenario->sign.key_params.parameters.eccDetail.curveID,
@@ -185,7 +174,8 @@ bool run_perf_verifysignature(
     }
 
     TPMT_SIGNATURE signature;
-    rc = sign(sapi_context, object_handle, &scenario->verifysignature.digest,
+    TPMT_SIG_SCHEME inScheme = get_sign_scheme(scenario->verifysignature.key_params.type);
+    rc = sign(sapi_context, object_handle, &inScheme, &scenario->verifysignature.digest,
             &signature, NULL);
 
     if (rc != TPM2_RC_SUCCESS) {
@@ -349,23 +339,6 @@ void run_perf_on_primary(
     free_result(&result);
 }
 
-#if 0
-void run_perf(
-        TSS2_SYS_CONTEXT *sapi_context,
-        const struct perf_scenario *scenario)
-{
-    TPMI_DH_OBJECT primary_handle;
-    bool ok = create_primary_for_perf(sapi_context, &primary_handle);
-    if (!ok) {
-        log_error("Failed to create primary object for perf testing.");
-    }
-
-    run_perf_on_primary(sapi_context, scenario, primary_handle);
-
-    Tss2_Sys_FlushContext(sapi_context, primary_handle);
-}
-#endif
-
 void run_perf_scenarios(
         TSS2_SYS_CONTEXT *sapi_context,
         const struct scenario_parameters *parameters)
@@ -375,9 +348,13 @@ void run_perf_scenarios(
     };
 
     TPMI_DH_OBJECT primary_handle;
-    bool ok = create_primary_for_perf(sapi_context, &primary_handle);
-    if (!ok) {
-        log_error("Failed to create primary object for perf testing.");
+    log_info("Perf: Creating primary key...");
+    TPM2_RC rc = create_some_primary(sapi_context, &primary_handle);
+    if (rc != TPM2_RC_SUCCESS) {
+        log_error("Perf: Failed to create primary key!");
+        return;
+    } else {
+        log_info("Perf: Created primary key with handle %08x", primary_handle);
     }
 
     if (command_in_options("sign")) {

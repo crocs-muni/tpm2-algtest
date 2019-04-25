@@ -1,19 +1,20 @@
 #include "perf_util.h"
 #include "util.h"
 #include "object_util.h"
+#include "logging.h"
 
 #include <time.h>
 
 TPM2_RC sign(
         TSS2_SYS_CONTEXT *sapi_context,
         TPMI_DH_OBJECT keyHandle,
+        const TPMT_SIG_SCHEME *inScheme,
         const TPM2B_DIGEST *digest,
         TPMT_SIGNATURE *signature,
         double *duration)
 {
     /* Cmd parameters */
     TSS2L_SYS_AUTH_COMMAND cmdAuthsArray = prepare_session();
-    TPMT_SIG_SCHEME inScheme = { .scheme = TPM2_ALG_NULL };
     TPMT_TK_HASHCHECK validation = {
         .tag = TPM2_ST_HASHCHECK,
         .hierarchy = TPM2_RH_NULL,
@@ -27,7 +28,7 @@ TPM2_RC sign(
     clock_gettime(CLOCK_MONOTONIC, &start);
 
     TPM2_RC rc = Tss2_Sys_Sign(sapi_context, keyHandle, &cmdAuthsArray,
-            digest, &inScheme, &validation, signature,
+            digest, inScheme, &validation, signature,
             &rspAuthsArray);
 
     clock_gettime(CLOCK_MONOTONIC, &end);
@@ -114,4 +115,25 @@ TPM2_RC rsa_decrypt(
         *duration = get_duration_s(&start, &end);
     }
     return rc;
+}
+
+TPMT_SIG_SCHEME get_sign_scheme(TPM2_ALG_ID type)
+{
+    switch (type) {
+    case TPM2_ALG_RSA:
+        return (TPMT_SIG_SCHEME) {
+            .scheme = TPM2_ALG_RSASSA,
+            .details = { .rsassa = { .hashAlg = TPM2_ALG_SHA256 } },
+        };
+    case TPM2_ALG_ECC:
+        return (TPMT_SIG_SCHEME) {
+            .scheme = TPM2_ALG_ECDSA,
+            .details = { .ecdsa = { .hashAlg = TPM2_ALG_SHA256 } },
+        };
+    default:
+        log_error("get_sign_scheme: unsupported key type.");
+        return (TPMT_SIG_SCHEME) {
+            .scheme = TPM2_ALG_NULL
+        };
+    }
 }

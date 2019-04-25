@@ -5,7 +5,7 @@
 struct tpm_algtest_options {
     int repetitions;
     int max_duration_s;
-    bool export_keys;
+    bool no_export;
     char* scenario;
     char* command;
     char* type;
@@ -14,6 +14,8 @@ struct tpm_algtest_options {
     int curveid;
     int verbose;
 };
+
+bool scenario_in_options(const char* scenario);
 
 bool command_in_options(const char* command);
 

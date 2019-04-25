@@ -1,6 +1,5 @@
 #pragma once
 #include <tss2/tss2_sys.h>
-#include "create.h"
 
 TPM2_RC test_parms(
         TSS2_SYS_CONTEXT *sapi_context,
