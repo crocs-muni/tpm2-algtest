@@ -38,12 +38,6 @@ set(SOURCES
     ${ALGTEST_SRC}/perf.c
     ${ALGTEST_SRC}/object_util.c
     ${ALGTEST_SRC}/perf_util.c
-    #${ALGTEST_SRC}/createprimary.c
-    #${ALGTEST_SRC}/create.c
-    #${ALGTEST_SRC}/createloaded.c
-    #${ALGTEST_SRC}/ecdh_keygen.c
-    #${ALGTEST_SRC}/sign.c
-    #${ALGTEST_SRC}/verifysignature.c
 )
 
 include_directories(${LIB_SRC} ${TOOLS_SRC} ${ALGTEST_SRC})

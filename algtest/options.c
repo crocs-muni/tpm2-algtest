@@ -4,6 +4,12 @@
 
 extern struct tpm_algtest_options options;
 
+bool scenario_in_options(const char* scenario)
+{
+    return strcmp(options.scenario, "all") == 0
+        || strcmp(options.scenario, scenario) == 0;
+}
+
 bool command_in_options(const char* command)
 {
     return strcmp(options.command, "all") == 0
