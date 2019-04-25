@@ -84,16 +84,18 @@ bool tpm2_tool_onstart(tpm2_options **opts)
 int tpm2_tool_onrun(TSS2_SYS_CONTEXT *sapi_context, tpm2_option_flags flags)
 {
     struct scenario_parameters parameters = {
-        .repetitions = options.repetitions,
-        .max_duration_s = options.max_duration_s,
+        .repetitions = 1000,
+        .max_duration_s = UINT_MAX,
     };
-    set_default_parameters(&parameters, 1000, UINT_MAX);
 
     if (scenario_in_options("keygen")) {
+        set_parameters_from_options(&parameters);
         run_keygen_scenarios(sapi_context, &parameters);
     }
 
     if (scenario_in_options("perf")) {
+        parameters.repetitions = 20;
+        set_parameters_from_options(&parameters);
         run_perf_scenarios(sapi_context, &parameters);
     }
 
