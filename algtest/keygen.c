@@ -60,8 +60,7 @@ bool test_detail(
     }
 
     if (scenario->export_keys) {
-        // TODO: create it only once and reuse
-        inPublic.publicArea.authPolicy = create_dup_policy(sapi_context);
+        inPublic.publicArea.authPolicy = get_dup_policy(sapi_context);
     }
 
     TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
