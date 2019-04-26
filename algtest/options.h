@@ -13,6 +13,7 @@ struct tpm_algtest_options {
     int keylen;
     int curveid;
     int verbose;
+    char* outdir;
 };
 
 bool scenario_in_options(const char* scenario);

@@ -20,13 +20,14 @@ struct tpm_algtest_options options = {
     .repetitions = 0,
     .max_duration_s = 0,
     .no_export = false,
-    .scenario = "none",
+    .scenario = "all",
     .command = "all",
     .type = "all",
     .algorithm = "all",
     .keylen = 0,
     .curveid = TPM2_ECC_NONE,
-    .verbose = TPM2_ALGTEST_VERBOSE_INFO
+    .verbose = TPM2_ALGTEST_VERBOSE_INFO,
+    .outdir = "out",
 };
 
 static
@@ -60,6 +61,9 @@ bool on_option(char key, char *value)
     case 'x':
         options.no_export = true;
         break;
+    case 'o':
+        options.outdir = value;
+        break;
     }
     return true;
 }
@@ -75,14 +79,24 @@ bool tpm2_tool_onstart(tpm2_options **opts)
         { "curveid", required_argument, NULL, 'C' },
         { "algorithm", required_argument, NULL, 'a' },
         { "no_export", no_argument, NULL, 'x' },
+        { "outdir", required_argument, NULL, 'o' },
     };
-    *opts = tpm2_options_new("s:d:n:t:c:l:C:a:x", ARRAY_LEN(topts), topts, on_option, NULL, 0);
+    *opts = tpm2_options_new("s:d:n:t:c:l:C:a:xo:", ARRAY_LEN(topts), topts, on_option, NULL, 0);
 
     return *opts != NULL;
 }
 
 int tpm2_tool_onrun(TSS2_SYS_CONTEXT *sapi_context, tpm2_option_flags flags)
 {
+    umask(0000);
+    struct stat sb;
+    if (stat(options.outdir, &sb) == -1) {
+        if (mkdir(options.outdir, 0777) != 0) {
+            perror("Cannot create output directory");
+            exit(1);
+        }
+    }
+
     struct scenario_parameters parameters = {
         .repetitions = 1000,
         .max_duration_s = UINT_MAX,

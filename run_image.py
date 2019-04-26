@@ -7,28 +7,34 @@ import glob
 import csv
 
 device = '/dev/tpm0'
-image_tag = 'v0.5'
+image_tag = 'v0.6'
 
-def zip():
-    zipf = zipfile.ZipFile('out.zip', 'w', zipfile.ZIP_DEFLATED)
-    for file in os.listdir('out'):
-        zipf.write('out/' + file)
+def zip(outdir):
+    zipf = zipfile.ZipFile(outdir + '.zip', 'w', zipfile.ZIP_DEFLATED)
+    for file in os.listdir(outdir):
+        zipf.write(os.path.join(outdir, file))
 
-def quicktest():
+def quicktest(results_dir):
     run_command = ['docker', 'run', '-it', '--init', '--device=' + device,
-            '--entrypoint=tpm2_getcap', 'simonstruk/tpm2-algtest:' + image_tag]
+            '--entrypoint=tpm2_getcap', 'simonstruk/tpm2-algtest:' + image_tag ]
+
     print('Running quicktest...')
-    with open('out/Quicktest_algorithms.txt', 'w') as outfile:
+    with open(os.path.join(results_dir, 'Quicktest_algorithms.txt'), 'w') as outfile:
         subprocess.run(run_command + ['-c', 'algorithms'], stdout=outfile).check_returncode()
-    with open('out/Quicktest_commands.txt', 'w') as outfile:
+
+    with open(os.path.join(results_dir, 'Quicktest_commands.txt'), 'w') as outfile:
         subprocess.run(run_command + ['-c', 'commands'], stdout=outfile).check_returncode()
-    with open('out/Quicktest_properties-fixed.txt', 'w') as outfile:
+
+    with open(os.path.join(results_dir, 'Quicktest_properties-fixed.txt'), 'w') as outfile:
         subprocess.run(run_command + ['-c', 'properties-fixed'], stdout=outfile).check_returncode()
-    with open('out/Quicktest_properties-variable.txt', 'w') as outfile:
+
+    with open(os.path.join(results_dir, 'Quicktest_properties-variable.txt'), 'w') as outfile:
         subprocess.run(run_command + ['-c', 'properties-variable'], stdout=outfile).check_returncode()
-    with open('out/Quicktest_ecc-curves.txt', 'w') as outfile:
+
+    with open(os.path.join(results_dir, 'Quicktest_ecc-curves.txt'), 'w') as outfile:
         subprocess.run(run_command + ['-c', 'ecc-curves'], stdout=outfile).check_returncode()
-    with open('out/Quicktest_handles-persistent.txt', 'w') as outfile:
+
+    with open(os.path.join(results_dir, 'Quicktest_handles-persistent.txt'), 'w') as outfile:
         subprocess.run(run_command + ['-c', 'handles-persistent'], stdout=outfile).check_returncode()
 
 def add_args(run_command, args):
@@ -110,28 +116,30 @@ def compute_rsa_privates(filename):
             writer.writerow(row)
 
 def keygen(args):
+    results_dir = os.path.join(args.outdir, 'results')
     run_command = [ 'docker', 'run', '-it', '--init', '--device=' + device,
-            '--volume=' + os.getcwd() + '/out:/tpm2-algtest/build/out:z',
+            '--volume=' + os.path.join(os.getcwd(), results_dir) + ':/tpm2-algtest/build/out:z',
             'simonstruk/tpm2-algtest:' + image_tag, '-T', 'device', '-s', 'keygen' ]
     add_args(run_command, args)
 
     print('Running keygen test...')
-    with open('out/keygen_log.txt', 'w') as logfile:
+    with open(os.path.join(results_dir, 'keygen_log.txt'), 'w') as logfile:
         run_image(run_command, logfile)
 
     print('Computing RSA private keys...')
-    for filename in glob.glob("out/Keygen_RSA_*_keys.csv"):
+    for filename in glob.glob(os.path.join(results_dir, 'Keygen_RSA_*_keys.csv')):
         print(filename)
         compute_rsa_privates(filename)
 
 def perf(args):
+    results_dir = os.path.join(args.outdir, 'results')
     run_command = [ 'docker', 'run', '-it', '--init', '--device=' + device,
-            '--volume=' + os.getcwd() + '/out:/tpm2-algtest/build/out:z',
+            '--volume=' + os.path.join(os.getcwd(), results_dir) + ':/tpm2-algtest/build/out:z',
             'simonstruk/tpm2-algtest:' + image_tag, '-T', 'device', '-s', 'perf' ]
     add_args(run_command, args)
 
     print('Running perf test...')
-    with open('out/perf_log.txt', 'w') as logfile:
+    with open(os.path.join(results_dir, 'perf_log.txt'), 'w') as logfile:
         run_image(run_command, logfile)
 
 def main():
@@ -143,6 +151,7 @@ def main():
     parser.add_argument('-l', '--keylen', type=int, required=False)
     parser.add_argument('-C', '--curveid', type=int, required=False)
     parser.add_argument('-c', '--command', type=str, required=False)
+    parser.add_argument('-o', '--outdir', type=str, required=False, default='out')
     args = parser.parse_args()
 
     if not os.path.exists(device):
@@ -151,27 +160,28 @@ def main():
 
     print('IMPORTANT: Please do not suspend or hibernate the computer while testing the TPM!')
 
+    results_dir = os.path.join(args.outdir, 'results')
     if args.test == 'quicktest':
-        os.makedirs('out', exist_ok=True)
-        quicktest()
-        zip()
+        os.makedirs(results_dir, exist_ok=True)
+        quicktest(results_dir)
+        zip(args.outdir)
     elif args.test == 'keygen':
-        os.makedirs('out', exist_ok=True)
+        os.makedirs(results_dir, exist_ok=True)
         keygen(args)
-        zip()
+        zip(args.outdir)
     elif args.test == 'perf':
-        os.makedirs('out', exist_ok=True)
+        os.makedirs(results_dir, exist_ok=True)
         perf(args)
-        zip()
+        zip(args.outdir)
     elif args.test == 'fulltest':
-        os.makedirs('out', exist_ok=True)
-        with open('out/docker_info.txt', 'w') as f:
+        os.makedirs(results_dir, exist_ok=True)
+        with open(os.path.join(results_dir, 'docker_info.txt'), 'w') as f:
             f.write('image ' + image_tag)
-        quicktest()
+        quicktest(results_dir)
         keygen(args)
         perf(args)
-        zip()
-        print('The tests are finished. Thank you! Please send the generated file (out.zip) to xstruk@fi.muni.cz')
+        zip(args.outdir)
+        print('The tests are finished. Thank you! Please send the generated file (' + args.outdir + '.zip) to xstruk@fi.muni.cz')
     else:
         print('invalid test type, needs to be one of: fulltest, quicktest, keygen, perf')
 
