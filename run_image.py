@@ -11,8 +11,9 @@ image_tag = 'v0.6'
 
 def zip(outdir):
     zipf = zipfile.ZipFile(outdir + '.zip', 'w', zipfile.ZIP_DEFLATED)
-    for file in os.listdir(outdir):
-        zipf.write(os.path.join(outdir, file))
+    for root, _, files in os.walk(outdir):
+        for file in files:
+            zipf.write(os.path.join(root, file))
 
 def quicktest(results_dir):
     run_command = ['docker', 'run', '-it', '--init', '--device=' + device,
