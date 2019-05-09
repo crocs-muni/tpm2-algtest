@@ -161,7 +161,7 @@ def main():
 
     print('IMPORTANT: Please do not suspend or hibernate the computer while testing the TPM!')
 
-    results_dir = os.path.join(args.outdir, 'results')
+    results_dir = os.path.join(args.outdir, 'detail')
     if args.test == 'quicktest':
         os.makedirs(results_dir, exist_ok=True)
         quicktest(results_dir)
