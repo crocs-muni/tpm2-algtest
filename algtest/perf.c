@@ -81,9 +81,9 @@ void output_results(
     case TPM2_CC_VerifySignature:
         fn_valid = get_csv_filename_verifysignature(&scenario->verifysignature, filename); break;
     case TPM2_CC_RSA_Encrypt:
-        snprintf(filename, 256, "Perf_RSA_Encrypt_%d.csv", scenario->rsa_encrypt.keylen); break;
+        snprintf(filename, 256, "Perf_RSA_Encrypt_RSA_%d.csv", scenario->rsa_encrypt.keylen); break;
     case TPM2_CC_RSA_Decrypt:
-        snprintf(filename, 256, "Perf_RSA_Decrypt_%d.csv", scenario->rsa_decrypt.keylen); break;
+        snprintf(filename, 256, "Perf_RSA_Decrypt_RSA_%d.csv", scenario->rsa_decrypt.keylen); break;
     default:
         log_error("Perf: (output_results) Command not supported.");
         return;
