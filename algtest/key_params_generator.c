@@ -1,4 +1,5 @@
 #include "options.h"
+#include "logging.h"
 #include "key_params_generator.h"
 
 extern struct tpm_algtest_options options;
@@ -75,6 +76,55 @@ bool get_next_key_params(TPMT_PUBLIC_PARMS *key_params)
             return get_next_key_type(key_params);
         }
     default:
+        return false;
+    }
+}
+
+bool get_next_rsa_scheme(TPMT_SIG_SCHEME *scheme)
+{
+    switch (scheme->scheme) {
+    case TPM2_ALG_NULL:
+        scheme->scheme = TPM2_ALG_RSASSA;
+        scheme->details = (TPMU_SIG_SCHEME) { .rsassa = { .hashAlg = TPM2_ALG_SHA256 } };
+        return true;
+    case TPM2_ALG_RSASSA:
+        scheme->scheme = TPM2_ALG_RSAPSS;
+        scheme->details = (TPMU_SIG_SCHEME) { .rsapss = { .hashAlg = TPM2_ALG_SHA256 } };
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool get_next_ecc_scheme(TPMT_SIG_SCHEME *scheme)
+{
+    switch (scheme->scheme) {
+    case TPM2_ALG_NULL:
+        scheme->scheme = TPM2_ALG_ECDSA;
+        scheme->details = (TPMU_SIG_SCHEME) { .ecdsa = { .hashAlg = TPM2_ALG_SHA256 } };
+        return true;
+    case TPM2_ALG_ECDSA:
+        scheme->scheme = TPM2_ALG_SM2;
+        scheme->details = (TPMU_SIG_SCHEME) { .sm2 = { .hashAlg = TPM2_ALG_SHA256 } };
+        return true;
+    case TPM2_ALG_SM2:
+        scheme->scheme = TPM2_ALG_ECSCHNORR;
+        scheme->details = (TPMU_SIG_SCHEME) { .ecschnorr = { .hashAlg = TPM2_ALG_SHA256 } };
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool get_next_sign_scheme(TPMT_SIG_SCHEME *scheme, TPM2_ALG_ID type)
+{
+    switch (type) {
+    case TPM2_ALG_RSA:
+        return get_next_rsa_scheme(scheme);
+    case TPM2_ALG_ECC:
+        return get_next_ecc_scheme(scheme);
+    default:
+        log_error("get_next_sign_scheme: Invalid algorithm type");
         return false;
     }
 }

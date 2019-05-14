@@ -34,12 +34,12 @@ bool get_csv_filename_sign(
 {
     switch (scenario->key_params.type) {
     case TPM2_ALG_RSA:
-        snprintf(filename, 256, "Perf_Sign_RSA_%d.csv",
-                scenario->key_params.parameters.rsaDetail.keyBits);
+        snprintf(filename, 256, "Perf_Sign:RSA_%d_0x%04x.csv",
+                scenario->key_params.parameters.rsaDetail.keyBits, scenario->scheme.scheme);
         break;
     case TPM2_ALG_ECC:
-        snprintf(filename, 256, "Perf_Sign_ECC_0x%04x.csv",
-                scenario->key_params.parameters.eccDetail.curveID);
+        snprintf(filename, 256, "Perf_Sign:ECC_0x%04x_0x%04x.csv",
+                scenario->key_params.parameters.eccDetail.curveID, scenario->scheme.scheme);
         break;
     default:
         log_error("Perf sign: (output_results) Algorithm type not supported.");
@@ -54,12 +54,12 @@ bool get_csv_filename_verifysignature(
 {
     switch (scenario->key_params.type) {
     case TPM2_ALG_RSA:
-        snprintf(filename, 256, "Perf_VerifySignature_RSA_%d.csv",
-                scenario->key_params.parameters.rsaDetail.keyBits);
+        snprintf(filename, 256, "Perf_VerifySignature:RSA_%d_0x%04x.csv",
+                scenario->key_params.parameters.rsaDetail.keyBits, scenario->scheme.scheme);
         break;
     case TPM2_ALG_ECC:
-        snprintf(filename, 256, "Perf_VerifySignature_ECC_0x%04x.csv",
-                scenario->key_params.parameters.eccDetail.curveID);
+        snprintf(filename, 256, "Perf_VerifySignature:ECC_0x%04x_0x%04x.csv",
+                scenario->key_params.parameters.eccDetail.curveID, scenario->scheme.scheme);
         break;
     default:
         log_error("Perf verifysignature: (output_results) Algorithm type not supported.");
@@ -81,9 +81,11 @@ void output_results(
     case TPM2_CC_VerifySignature:
         fn_valid = get_csv_filename_verifysignature(&scenario->verifysignature, filename); break;
     case TPM2_CC_RSA_Encrypt:
-        snprintf(filename, 256, "Perf_RSA_Encrypt_RSA_%d.csv", scenario->rsa_encrypt.keylen); break;
+        snprintf(filename, 256, "Perf_RSA_Encrypt:RSA_%d.csv", scenario->rsa_encrypt.keylen); break;
     case TPM2_CC_RSA_Decrypt:
-        snprintf(filename, 256, "Perf_RSA_Decrypt_RSA_%d.csv", scenario->rsa_decrypt.keylen); break;
+        snprintf(filename, 256, "Perf_RSA_Decrypt:RSA_%d.csv", scenario->rsa_decrypt.keylen); break;
+    case TPM2_CC_GetRandom:
+        snprintf(filename, 256, "Perf_GetRandom.csv"); break;
     default:
         log_error("Perf: (output_results) Command not supported.");
         return;
@@ -105,7 +107,6 @@ bool run_perf_sign(
         struct perf_result *result)
 {
     TPM2B_PUBLIC inPublic = prepare_template(&scenario->sign.key_params);
-    TPMT_SIG_SCHEME inScheme = get_sign_scheme(scenario->sign.key_params.type);
 
     TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
     if (rc != TPM2_RC_SUCCESS) {
@@ -130,20 +131,22 @@ bool run_perf_sign(
         }
 
         TPMT_SIGNATURE signature;
-        result->data_points[i].rc = sign(sapi_context, object_handle, &inScheme,
-                &scenario->sign.digest, &signature,
+        result->data_points[i].rc = sign(sapi_context, object_handle,
+                &scenario->sign.scheme, &scenario->sign.digest, &signature,
                 &result->data_points[i].duration_s);
 
         ++result->size;
         switch (scenario->sign.key_params.type) {
         case TPM2_ALG_RSA:
-            log_info("Perf sign %d: RSA | keybits %d | duration %f | rc %04x",
-                    i, scenario->sign.key_params.parameters.rsaDetail.keyBits,
+            log_info("Perf sign %d: RSA | scheme %04x | keybits %d | duration %f | rc %04x",
+                    i, scenario->sign.scheme.scheme,
+                    scenario->sign.key_params.parameters.rsaDetail.keyBits,
                     result->data_points[i].duration_s, result->data_points[i].rc);
             break;
         case TPM2_ALG_ECC:
-            log_info("Perf sign %d: ECC | curve %04x | duration %f | rc %04x",
-                    i, scenario->sign.key_params.parameters.eccDetail.curveID,
+            log_info("Perf sign %d: ECC | scheme %04x | curve %04x | duration %f | rc %04x",
+                    i, scenario->sign.scheme.scheme,
+                    scenario->sign.key_params.parameters.eccDetail.curveID,
                     result->data_points[i].duration_s, result->data_points[i].rc);
         }
     }
@@ -174,9 +177,8 @@ bool run_perf_verifysignature(
     }
 
     TPMT_SIGNATURE signature;
-    TPMT_SIG_SCHEME inScheme = get_sign_scheme(scenario->verifysignature.key_params.type);
-    rc = sign(sapi_context, object_handle, &inScheme, &scenario->verifysignature.digest,
-            &signature, NULL);
+    rc = sign(sapi_context, object_handle, &scenario->verifysignature.scheme,
+            &scenario->verifysignature.digest, &signature, NULL);
 
     if (rc != TPM2_RC_SUCCESS) {
         log_error("Perf verifysignature: Could not create signature %04x", rc);
@@ -201,13 +203,15 @@ bool run_perf_verifysignature(
         ++result->size;
         switch (scenario->verifysignature.key_params.type) {
         case TPM2_ALG_RSA:
-            log_info("Perf verifysignature %d: RSA | keybits %d | duration %f | rc %04x",
-                    i, scenario->verifysignature.key_params.parameters.rsaDetail.keyBits,
+            log_info("Perf verifysignature %d: RSA | scheme %04x | keybits %d | duration %f | rc %04x",
+                    i, scenario->verifysignature.scheme.scheme,
+                    scenario->verifysignature.key_params.parameters.rsaDetail.keyBits,
                     result->data_points[i].duration_s, result->data_points[i].rc);
                     break;
         case TPM2_ALG_ECC:
-            log_info("Perf verifysignature %d: ECC | curve %04x | duration %f | rc %04x",
-                    i, scenario->verifysignature.key_params.parameters.eccDetail.curveID,
+            log_info("Perf verifysignature %d: ECC | scheme %04x | curve %04x | duration %f | rc %04x",
+                    i, scenario->verifysignature.scheme.scheme,
+                    scenario->verifysignature.key_params.parameters.eccDetail.curveID,
                     result->data_points[i].duration_s, result->data_points[i].rc);
         }
     }
@@ -339,6 +343,35 @@ void run_perf_on_primary(
     free_result(&result);
 }
 
+void run_perf_getrandom(
+        TSS2_SYS_CONTEXT *sapi_context,
+        const struct perf_scenario *scenario)
+{
+    struct perf_result result;
+    if (!alloc_result(scenario, &result)) {
+        log_error("Perf: cannot allocate memory for result.");
+        return;
+    }
+    result.size = 0;
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    for (unsigned i = 0; i < scenario->parameters.repetitions; ++i) {
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        if (get_duration_s(&start, &end) > scenario->parameters.max_duration_s) {
+            break;
+        }
+
+        result.data_points[i].rc = getrandom(sapi_context, &result.data_points[i].duration_s);
+        ++result.size;
+        log_info("Perf getrandom: %d: duration %f | rc %04x",
+                i, result.data_points[i].duration_s, result.data_points[i].rc);
+    }
+
+    output_results(scenario, &result);
+    free_result(&result);
+}
+
 void run_perf_scenarios(
         TSS2_SYS_CONTEXT *sapi_context,
         const struct scenario_parameters *parameters)
@@ -361,11 +394,15 @@ void run_perf_scenarios(
         scenario.command_code = TPM2_CC_Sign;
         scenario.sign = (struct perf_sign_scenario) {
             .key_params = { .type = TPM2_ALG_NULL },
+            .scheme = { .scheme = TPM2_ALG_NULL },
             .digest = { .size = 32 }, // Using SHA256
         };
         memset(&scenario.sign.digest.buffer, 0x00, scenario.sign.digest.size);
         while (get_next_key_params(&scenario.sign.key_params)) {
-            run_perf_on_primary(sapi_context, &scenario, primary_handle);
+            while (get_next_sign_scheme(&scenario.sign.scheme, scenario.sign.key_params.type)) {
+                run_perf_on_primary(sapi_context, &scenario, primary_handle);
+            }
+            scenario.sign.scheme.scheme = TPM2_ALG_NULL;
         }
     }
 
@@ -373,11 +410,15 @@ void run_perf_scenarios(
         scenario.command_code = TPM2_CC_VerifySignature;
         scenario.verifysignature = (struct perf_verifysignature_scenario) {
             .key_params = { .type = TPM2_ALG_NULL },
+            .scheme = { .scheme = TPM2_ALG_NULL },
             .digest = { .size = 32 }, // Using SHA256
         };
         memset(&scenario.verifysignature.digest.buffer, 0x00, scenario.verifysignature.digest.size);
         while (get_next_key_params(&scenario.verifysignature.key_params)) {
-            run_perf_on_primary(sapi_context, &scenario, primary_handle);
+            while (get_next_sign_scheme(&scenario.verifysignature.scheme, scenario.verifysignature.key_params.type)) {
+                run_perf_on_primary(sapi_context, &scenario, primary_handle);
+            }
+            scenario.verifysignature.scheme.scheme = TPM2_ALG_NULL;
         }
     }
 
@@ -403,6 +444,15 @@ void run_perf_scenarios(
         while (get_next_rsa_keylen(&scenario.rsa_decrypt.keylen)) {
             run_perf_on_primary(sapi_context, &scenario, primary_handle);
         }
+    }
+
+    if (command_in_options("getrandom")) {
+        scenario.command_code = TPM2_CC_GetRandom;
+        run_perf_getrandom(sapi_context, &scenario);
+    }
+
+    if (command_in_options("encryptdecrypt")) {
+        // TODO: get_next_symcipher
     }
 
     Tss2_Sys_FlushContext(sapi_context, primary_handle);

@@ -117,23 +117,22 @@ TPM2_RC rsa_decrypt(
     return rc;
 }
 
-TPMT_SIG_SCHEME get_sign_scheme(TPM2_ALG_ID type)
+TPM2_RC getrandom(
+        TSS2_SYS_CONTEXT *sapi_context,
+        double *duration)
 {
-    switch (type) {
-    case TPM2_ALG_RSA:
-        return (TPMT_SIG_SCHEME) {
-            .scheme = TPM2_ALG_RSASSA,
-            .details = { .rsassa = { .hashAlg = TPM2_ALG_SHA256 } },
-        };
-    case TPM2_ALG_ECC:
-        return (TPMT_SIG_SCHEME) {
-            .scheme = TPM2_ALG_ECDSA,
-            .details = { .ecdsa = { .hashAlg = TPM2_ALG_SHA256 } },
-        };
-    default:
-        log_error("get_sign_scheme: unsupported key type.");
-        return (TPMT_SIG_SCHEME) {
-            .scheme = TPM2_ALG_NULL
-        };
+    TPM2B_DIGEST randomBytes = { .size = 0 };
+    TSS2L_SYS_AUTH_RESPONSE rspAuthsArray;
+
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    TPM2_RC rc = Tss2_Sys_GetRandom(sapi_context, NULL, 32, &randomBytes,
+            &rspAuthsArray);
+
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    if (duration != NULL) {
+        *duration = get_duration_s(&start, &end);
     }
+    return rc;
 }

@@ -8,7 +8,7 @@ import csv
 import datetime
 
 device = '/dev/tpm0'
-image_tag = 'v0.6'
+image_tag = 'v0.8'
 
 def zip(outdir):
     zipf = zipfile.ZipFile(outdir + '.zip', 'w', zipfile.ZIP_DEFLATED)
@@ -183,7 +183,7 @@ def write_header(file, manufacturer, vendor_str, fw):
     file.write(f'Manufacturer; {manufacturer}\n')
     file.write(f'Vendor string; {vendor_str}\n')
     file.write(f'Firmware version; {fw}\n')
-    file.write(f'Image tag; {image_tag}\n')
+    file.write(f'Image tag; {image_tag}\n\n')
 
 def compute_stats(infile, *, rsa2048=False):
     ignore = 5 if rsa2048 else 0
@@ -255,36 +255,26 @@ def write_support_file(support_file, detail_dir):
                     support_file.write(line + '\n')
 
 def write_perf_file(perf_file, detail_dir):
-    keygen_csvs = list(filter(lambda fn: '_keys.csv' not in fn,
-        glob.glob(os.path.join(detail_dir, 'Keygen_*.csv'))))
-    keygen_csvs.sort()
-    if len(keygen_csvs) > 0:
-        perf_file.write('\nTPM2_Create\n')
-
-    for filepath in keygen_csvs:
-        filename = os.path.basename(filepath)
-        key_params = filename[filename.find('_') + 1:filename.find('.csv')]
-        key_params = key_params.replace('_', ' ')
-        perf_file.write(f'key params:;{key_params}\n')
-        with open(filepath, 'r') as infile:
-            avg_op, min_op, max_op, total, success, fail = compute_stats(infile, rsa2048=key_params == 'RSA 2048')
-        perf_file.write(f'operation stats (ms/op):;avg op:;{avg_op:.2f};min op:;{min_op:.2f};max op:;{max_op:.2f}\n')
-        perf_file.write(f'operation info:;total iterations:;{total};successful;{success};failed;{fail}\n\n')
-
     perf_csvs = glob.glob(os.path.join(detail_dir, 'Perf_*.csv'))
     perf_csvs.sort()
     command = ''
     for filepath in perf_csvs:
         filename = os.path.basename(filepath)
-        kp_idx = filename[:filename.rfind('_')].rfind('_')
-        new_command = 'TPM2_' + filename[filename.find('_')+1:kp_idx]
+        params_idx = filename.find(':')
+        suffix_idx = filename.find('.csv')
+        new_command = filename[5:suffix_idx if params_idx == -1 else params_idx]
+        params = filename[params_idx+1:suffix_idx]
         if new_command != command:
             command = new_command
-            perf_file.write(command + '\n\n')
-        key_params = filename[kp_idx+1:filename.find('.csv')]
-        key_params = key_params.replace('_', ' ')
+            perf_file.write('TPM2_' + command + '\n\n')
 
-        perf_file.write(f'key params:;{key_params}\n')
+        if command == 'GetRandom':
+            perf_file.write(f'Data length (bytes):;32\n')
+        elif command in [ 'Sign', 'VerifySignature' ]:
+            perf_file.write(f'Key parameters:;{params[:params.rfind("_")]};Signing scheme:;{params[params.rfind("_")+1:]}\n')
+        else:
+            perf_file.write(f'Key parameters:;{params}\n')
+
         with open(filepath, 'r') as infile:
             avg_op, min_op, max_op, total, success, fail = compute_stats(infile)
             perf_file.write(f'operation stats (ms/op):;avg op:;{avg_op:.2f};min op:;{min_op:.2f};max op:;{max_op:.2f}\n')

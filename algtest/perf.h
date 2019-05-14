@@ -6,11 +6,13 @@
 
 struct perf_sign_scenario {
     TPMT_PUBLIC_PARMS key_params;
+    TPMT_SIG_SCHEME scheme;
     TPM2B_DIGEST digest;
 };
 
 struct perf_verifysignature_scenario {
     TPMT_PUBLIC_PARMS key_params;
+    TPMT_SIG_SCHEME scheme;
     TPM2B_DIGEST digest;
 };
 

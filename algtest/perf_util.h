@@ -30,4 +30,6 @@ TPM2_RC rsa_decrypt(
         TPM2B_PUBLIC_KEY_RSA *message,
         double *duration);
 
-TPMT_SIG_SCHEME get_sign_scheme(TPM2_ALG_ID type);
+TPM2_RC getrandom(
+        TSS2_SYS_CONTEXT *sapi_context,
+        double *duration);

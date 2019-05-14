@@ -108,15 +108,15 @@ void output_results(
     char filename_keys[256];
     switch (scenario->key_params.type) {
     case TPM2_ALG_RSA:
-        snprintf(filename, 256, "Keygen_RSA_%d.csv",
+        snprintf(filename, 256, "Perf_Create:RSA_%d.csv",
                 scenario->key_params.parameters.rsaDetail.keyBits);
-        snprintf(filename_keys, 256, "Keygen_RSA_%d_keys.csv",
+        snprintf(filename_keys, 256, "Keygen:RSA_%d.csv",
                 scenario->key_params.parameters.rsaDetail.keyBits);
         break;
     case TPM2_ALG_ECC:
-        snprintf(filename, 256, "Keygen_ECC_0x%04x.csv",
+        snprintf(filename, 256, "Perf_Create:ECC_0x%04x.csv",
                 scenario->key_params.parameters.eccDetail.curveID);
-        snprintf(filename_keys, 256, "Keygen_ECC_0x%04x_keys.csv",
+        snprintf(filename_keys, 256, "Keygen:ECC_0x%04x.csv",
                 scenario->key_params.parameters.eccDetail.curveID);
         break;
     default:
