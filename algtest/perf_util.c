@@ -136,3 +136,31 @@ TPM2_RC getrandom(
     }
     return rc;
 }
+
+TPM2_RC encryptdecrypt(
+        TSS2_SYS_CONTEXT *sapi_context,
+        TPMI_DH_OBJECT keyHandle,
+        const TPM2B_IV *inIv,
+        const TPM2B_MAX_BUFFER *inData,
+        double *duration)
+{
+    /* Cmd parameters */
+    TSS2L_SYS_AUTH_COMMAND cmdAuthsArray = prepare_session();
+
+    /* Rsp parameters */
+    TPM2B_MAX_BUFFER outData;
+    TPM2B_IV outIv;
+    TSS2L_SYS_AUTH_RESPONSE rspAuthsArray;
+
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    TPM2_RC rc = Tss2_Sys_EncryptDecrypt(sapi_context, keyHandle, &cmdAuthsArray,
+            TPM2_NO, TPM2_ALG_CBC, inIv, inData, &outData, &outIv, &rspAuthsArray);
+
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    if (duration != NULL) {
+        *duration = get_duration_s(&start, &end);
+    }
+    return rc;
+}

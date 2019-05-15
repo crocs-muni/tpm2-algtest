@@ -88,6 +88,10 @@ void output_results(
                 scenario->rsa_decrypt.keylen, scenario->rsa_decrypt.scheme.scheme); break;
     case TPM2_CC_GetRandom:
         snprintf(filename, 256, "Perf_GetRandom.csv"); break;
+    case TPM2_CC_EncryptDecrypt:
+        snprintf(filename, 256, "Perf_EncryptDecrypt:0x%04x_%d.csv",
+                scenario->encryptdecrypt.sym.algorithm, scenario->encryptdecrypt.sym.keyBits);
+        break;
     default:
         log_error("Perf: (output_results) Command not supported.");
         return;
@@ -313,6 +317,63 @@ bool run_perf_rsa_decrypt(
     return true;
 }
 
+bool run_perf_encryptdecrypt(
+        TSS2_SYS_CONTEXT *sapi_context,
+        const struct perf_scenario *scenario,
+        TPMI_DH_OBJECT primary_handle,
+        struct perf_result *result)
+{
+    TPMT_PUBLIC_PARMS key_params = {
+        .type = TPM2_ALG_SYMCIPHER,
+        .parameters = {
+            .symDetail = {
+                .sym = scenario->encryptdecrypt.sym,
+            }
+        }
+    };
+
+    TPM2B_PUBLIC inPublic = prepare_template(&key_params);
+
+    TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
+    if (rc != TPM2_RC_SUCCESS) {
+        return false;
+    }
+
+    TPM2_HANDLE object_handle;
+    log_info("Perf encryptdecrypt: Generating key...");
+    rc = create_loaded(sapi_context, &inPublic, primary_handle, &object_handle);
+    if (rc != TPM2_RC_SUCCESS) {
+        log_error("Perf encryptdecrypt: Error when creating key %04x", rc);
+        return false;
+    }
+
+    TPM2B_IV inIv = { .size = scenario->encryptdecrypt.sym.keyBits.sym / 8 };
+    memset(&inIv.buffer, 0x00, inIv.size);
+    TPM2B_MAX_BUFFER inData = { .size = 256 };
+    memset(&inData.buffer, 0x00, inData.size);
+
+    result->size = 0;
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    for (unsigned i = 0; i < scenario->parameters.repetitions; ++i) {
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        if (get_duration_s(&start, &end) > scenario->parameters.max_duration_s) {
+            break;
+        }
+
+        result->data_points[i].rc = encryptdecrypt(sapi_context, object_handle,
+                &inIv, &inData, &result->data_points[i].duration_s);
+        ++result->size;
+
+        log_info("Perf encryptdecrypt %d: algorithm %04x | keybits %d | duration %f | rc %04x",
+            i, scenario->encryptdecrypt.sym.algorithm, scenario->encryptdecrypt.sym.keyBits,
+            result->data_points[i].duration_s, result->data_points[i].rc);
+    }
+    Tss2_Sys_FlushContext(sapi_context, object_handle);
+    return true;
+}
+
 void run_perf_on_primary(
         TSS2_SYS_CONTEXT *sapi_context,
         const struct perf_scenario *scenario,
@@ -337,6 +398,9 @@ void run_perf_on_primary(
         break;
     case TPM2_CC_RSA_Decrypt:
         ok = run_perf_rsa_decrypt(sapi_context, scenario, primary_handle, &result);
+        break;
+    case TPM2_CC_EncryptDecrypt:
+        ok = run_perf_encryptdecrypt(sapi_context, scenario, primary_handle, &result);
         break;
     default:
         log_warning("Perf: unsupported command code %04x", scenario->command_code);
@@ -463,7 +527,17 @@ void run_perf_scenarios(
     }
 
     if (command_in_options("encryptdecrypt")) {
-        // TODO: get_next_symcipher
+        scenario.command_code = TPM2_CC_EncryptDecrypt;
+        scenario.encryptdecrypt = (struct perf_encryptdecrypt_scenario) {
+            .sym = {
+                .algorithm = TPM2_ALG_NULL,
+                .keyBits = 0,
+                .mode = TPM2_ALG_NULL,
+            },
+        };
+        while (get_next_symcipher(&scenario.encryptdecrypt.sym)) {
+            run_perf_on_primary(sapi_context, &scenario, primary_handle);
+        }
     }
 
     Tss2_Sys_FlushContext(sapi_context, primary_handle);

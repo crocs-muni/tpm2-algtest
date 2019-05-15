@@ -35,3 +35,10 @@ TPM2_RC rsa_decrypt(
 TPM2_RC getrandom(
         TSS2_SYS_CONTEXT *sapi_context,
         double *duration);
+
+TPM2_RC encryptdecrypt(
+        TSS2_SYS_CONTEXT *sapi_context,
+        TPMI_DH_OBJECT keyHandle,
+        const TPM2B_IV *inIv,
+        const TPM2B_MAX_BUFFER *inData,
+        double *duration);

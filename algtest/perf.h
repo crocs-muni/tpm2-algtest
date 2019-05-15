@@ -28,6 +28,10 @@ struct perf_rsa_decrypt_scenario {
     TPM2B_PUBLIC_KEY_RSA message;
 };
 
+struct perf_encryptdecrypt_scenario {
+    TPMT_SYM_DEF_OBJECT sym;
+};
+
 struct perf_scenario {
     struct scenario_parameters parameters;
     TPM2_CC command_code;
@@ -36,6 +40,7 @@ struct perf_scenario {
         struct perf_verifysignature_scenario verifysignature;
         struct perf_rsa_encrypt_scenario rsa_encrypt;
         struct perf_rsa_decrypt_scenario rsa_decrypt;
+        struct perf_encryptdecrypt_scenario encryptdecrypt;
     };
 };
 
