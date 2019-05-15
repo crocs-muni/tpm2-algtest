@@ -98,6 +98,9 @@ void output_results(
     case TPM2_CC_HMAC:
         snprintf(filename, 256, "Perf_HMAC.csv");
         break;
+    case TPM2_CC_Hash:
+        snprintf(filename, 256, "Perf_Hash:0x%04x.csv", scenario->hash.hash_alg);
+        break;
     default:
         log_error("Perf: (output_results) Command not supported.");
         return;
@@ -515,6 +518,46 @@ void run_perf_getrandom(
     free_result(&result);
 }
 
+void run_perf_hash(
+        TSS2_SYS_CONTEXT *sapi_context,
+        const struct perf_scenario *scenario)
+{
+    TPM2B_MAX_BUFFER data = { .size = 256 };
+    memset(&data.buffer, 0x00, data.size);
+
+    /* Test if alg is supported */
+    if (hash(sapi_context, &data, scenario->hash.hash_alg, NULL) == 0x02c3) {
+        return;
+    }
+
+    struct perf_result result;
+    if (!alloc_result(scenario, &result)) {
+        log_error("Perf: cannot allocate memory for result.");
+        return;
+    }
+
+    result.size = 0;
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    for (unsigned i = 0; i < scenario->parameters.repetitions; ++i) {
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        if (get_duration_s(&start, &end) > scenario->parameters.max_duration_s) {
+            break;
+        }
+
+        result.data_points[i].rc = hash(sapi_context, &data,
+                scenario->hash.hash_alg, &result.data_points[i].duration_s);
+        ++result.size;
+        log_info("Perf hash: %d: algorithm %04x | duration %f | rc %04x",
+                i, scenario->hash.hash_alg, result.data_points[i].duration_s,
+                result.data_points[i].rc);
+    }
+
+    output_results(scenario, &result);
+    free_result(&result);
+}
+
 void run_perf_scenarios(
         TSS2_SYS_CONTEXT *sapi_context,
         const struct scenario_parameters *parameters)
@@ -623,6 +666,14 @@ void run_perf_scenarios(
     if (command_in_options("hmac")) {
         scenario.command_code = TPM2_CC_HMAC;
         run_perf_on_primary(sapi_context, &scenario, primary_handle);
+    }
+
+    if (command_in_options("hash")) {
+        scenario.command_code = TPM2_CC_Hash;
+        scenario.hash.hash_alg = TPM2_ALG_NULL;
+        while (get_next_hash_algorithm(&scenario.hash.hash_alg)) {
+            run_perf_hash(sapi_context, &scenario);
+        }
     }
 
     Tss2_Sys_FlushContext(sapi_context, primary_handle);

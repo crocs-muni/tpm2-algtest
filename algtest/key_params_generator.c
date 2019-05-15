@@ -294,3 +294,31 @@ bool get_next_sign_scheme(TPMT_SIG_SCHEME *scheme, TPM2_ALG_ID type)
         return false;
     }
 }
+
+bool get_next_hash_algorithm(TPMI_ALG_HASH *hash_alg)
+{
+    switch (*hash_alg) {
+    case TPM2_ALG_NULL:
+        *hash_alg = TPM2_ALG_SHA1; return true;
+    case TPM2_ALG_SHA1:
+        *hash_alg = TPM2_ALG_MGF1; return true;
+    case TPM2_ALG_MGF1:
+        *hash_alg = TPM2_ALG_SHA256; return true;
+    case TPM2_ALG_SHA256:
+        *hash_alg = TPM2_ALG_SHA384; return true;
+    case TPM2_ALG_SHA384:
+        *hash_alg = TPM2_ALG_SHA512; return true;
+    case TPM2_ALG_SHA512:
+        *hash_alg = TPM2_ALG_SM3_256; return true;
+    case TPM2_ALG_SM3_256:
+        *hash_alg = TPM2_ALG_SHA3_256; return true;
+    case TPM2_ALG_SHA3_256:
+        *hash_alg = TPM2_ALG_SHA3_384; return true;
+    case TPM2_ALG_SHA3_384:
+        *hash_alg = TPM2_ALG_SHA3_512; return true;
+    case TPM2_ALG_SHA3_512:
+        return false;
+    default:
+        return false;
+    }
+}

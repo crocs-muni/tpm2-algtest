@@ -268,7 +268,7 @@ def write_perf_file(perf_file, detail_dir):
         params_idx = filename.find(':')
         suffix_idx = filename.find('.csv')
         new_command = filename[5:suffix_idx if params_idx == -1 else params_idx]
-        params = filename[params_idx+1:suffix_idx]
+        params = filename[params_idx+1:suffix_idx].split('_')
         if new_command != command:
             command = new_command
             perf_file.write('TPM2_' + command + '\n\n')
@@ -276,14 +276,15 @@ def write_perf_file(perf_file, detail_dir):
         if command == 'GetRandom':
             perf_file.write(f'Data length (bytes):;32\n')
         elif command in [ 'Sign', 'VerifySignature, RSA_Encrypt, RSA_Decrypt' ]:
-            perf_file.write(f'Key parameters:;{params[:params.rfind("_")]};Scheme:;{params[params.rfind("_")+1:]}\n')
+            perf_file.write(f'Key parameters:;{params[0]};Scheme:;{params[1]}\n')
         elif command == 'EncryptDecrypt':
-            p = params.split('_')
-            perf_file.write(f'Algorithm:;{p[0]};Key length:;{p[1]};Mode:;{p[2]};Encrypt/decrypt?:;{p[3]};Data length (bytes):;256\n')
+            perf_file.write(f'Algorithm:;{params[0]};Key length:;{params[1]};Mode:;{params[2]};Encrypt/decrypt?:;{params[3]};Data length (bytes):;256\n')
         elif command == 'HMAC':
             perf_file.write('Hash algorithm:;SHA-256;Data length (bytes):;256\n')
+        elif command == 'Hash':
+            perf_file.write(f'Hash algorithm:;{params[0]};Data length (bytes):;256\n')
         else:
-            perf_file.write(f'Key parameters:;{params}\n')
+            perf_file.write(f'Key parameters:;{params[0]}\n')
 
         with open(filepath, 'r') as infile:
             avg_op, min_op, max_op, total, success, fail, error = compute_stats(infile)

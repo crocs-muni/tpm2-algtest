@@ -50,3 +50,9 @@ TPM2_RC hmac(
         const TPM2B_MAX_BUFFER *buffer,
         TPMI_ALG_HASH hashAlg,
         double *duration);
+
+TPM2_RC hash(
+        TSS2_SYS_CONTEXT *sapi_context,
+        const TPM2B_MAX_BUFFER *data,
+        TPMI_ALG_HASH hashAlg,
+        double *duration);

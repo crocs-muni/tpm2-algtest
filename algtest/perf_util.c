@@ -192,3 +192,27 @@ TPM2_RC hmac(
     }
     return rc;
 }
+
+TPM2_RC hash(
+        TSS2_SYS_CONTEXT *sapi_context,
+        const TPM2B_MAX_BUFFER *data,
+        TPMI_ALG_HASH hashAlg,
+        double *duration)
+{
+    TPM2B_DIGEST outHash = { .size = 0 };
+    TPMT_TK_HASHCHECK validation;
+    TSS2L_SYS_AUTH_RESPONSE rspAuthsArray;
+
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    TPM2_RC rc = Tss2_Sys_Hash(sapi_context, NULL, data, hashAlg,
+            TPM2_RH_NULL, &outHash, &validation, &rspAuthsArray);
+
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    if (duration != NULL) {
+        *duration = get_duration_s(&start, &end);
+    }
+    return rc;
+}
+
