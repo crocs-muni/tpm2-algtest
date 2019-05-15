@@ -95,6 +95,9 @@ void output_results(
                 scenario->encryptdecrypt.sym.mode.sym,
                 scenario->encryptdecrypt.decrypt ? "decrypt" : "encrypt");
         break;
+    case TPM2_CC_HMAC:
+        snprintf(filename, 256, "Perf_HMAC.csv");
+        break;
     default:
         log_error("Perf: (output_results) Command not supported.");
         return;
@@ -375,12 +378,69 @@ bool run_perf_encryptdecrypt(
         ++result->size;
 
         log_info("Perf encryptdecrypt %d: algorithm %04x | keybits %d | mode %04x | %s | duration %f | rc %04x",
-            i, scenario->encryptdecrypt.sym.algorithm,
-            scenario->encryptdecrypt.sym.keyBits,
-            scenario->encryptdecrypt.sym.mode,
-            scenario->encryptdecrypt.decrypt ? "decrypt" : "encrypt",
-            result->data_points[i].duration_s, result->data_points[i].rc);
+                i, scenario->encryptdecrypt.sym.algorithm,
+                scenario->encryptdecrypt.sym.keyBits,
+                scenario->encryptdecrypt.sym.mode,
+                scenario->encryptdecrypt.decrypt ? "decrypt" : "encrypt",
+                result->data_points[i].duration_s, result->data_points[i].rc);
     }
+    Tss2_Sys_FlushContext(sapi_context, object_handle);
+    return true;
+}
+
+bool run_perf_hmac(
+        TSS2_SYS_CONTEXT *sapi_context,
+        const struct perf_scenario *scenario,
+        TPMI_DH_OBJECT primary_handle,
+        struct perf_result *result)
+{
+    TPMT_PUBLIC_PARMS key_params = {
+        .type = TPM2_ALG_KEYEDHASH,
+        .parameters = {
+            .keyedHashDetail = {
+                .scheme = {
+                    .scheme = TPM2_ALG_HMAC,
+                    .details = { .hmac = { .hashAlg = TPM2_ALG_SHA256 } },
+                }
+            }
+        }
+    };
+    TPM2B_PUBLIC inPublic = prepare_template(&key_params);
+
+    TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
+    if (rc != TPM2_RC_SUCCESS) {
+        return false;
+    }
+
+    TPM2_HANDLE object_handle;
+    log_info("Perf hmac: Generating HMAC key...");
+    rc = create_loaded(sapi_context, &inPublic, primary_handle, &object_handle);
+    if (rc != TPM2_RC_SUCCESS) {
+        log_error("Perf hmac: Error when creating HMAC key %04x", rc);
+        return false;
+    }
+
+    result->size = 0;
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    TPM2B_MAX_BUFFER buffer = { .size = 256 };
+    memset(&buffer.buffer, 0x00, buffer.size);
+
+    for (unsigned i = 0; i < scenario->parameters.repetitions; ++i) {
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        if (get_duration_s(&start, &end) > scenario->parameters.max_duration_s) {
+            break;
+        }
+
+        result->data_points[i].rc = hmac(sapi_context, object_handle, &buffer,
+                TPM2_ALG_NULL, &result->data_points[i].duration_s);
+        ++result->size;
+
+        log_info("Perf hmac %d: duration %f | rc %04x",
+                i, result->data_points[i].duration_s, result->data_points[i].rc);
+    }
+
     Tss2_Sys_FlushContext(sapi_context, object_handle);
     return true;
 }
@@ -412,6 +472,9 @@ void run_perf_on_primary(
         break;
     case TPM2_CC_EncryptDecrypt:
         ok = run_perf_encryptdecrypt(sapi_context, scenario, primary_handle, &result);
+        break;
+    case TPM2_CC_HMAC:
+        ok = run_perf_hmac(sapi_context, scenario, primary_handle, &result);
         break;
     default:
         log_warning("Perf: unsupported command code %04x", scenario->command_code);
@@ -555,6 +618,11 @@ void run_perf_scenarios(
             }
             scenario.encryptdecrypt.sym.mode.sym = TPM2_ALG_NULL;
         }
+    }
+
+    if (command_in_options("hmac")) {
+        scenario.command_code = TPM2_CC_HMAC;
+        run_perf_on_primary(sapi_context, &scenario, primary_handle);
     }
 
     Tss2_Sys_FlushContext(sapi_context, primary_handle);

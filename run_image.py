@@ -280,6 +280,8 @@ def write_perf_file(perf_file, detail_dir):
         elif command == 'EncryptDecrypt':
             p = params.split('_')
             perf_file.write(f'Algorithm:;{p[0]};Key length:;{p[1]};Mode:;{p[2]};Encrypt/decrypt?:;{p[3]};Data length (bytes):;256\n')
+        elif command == 'HMAC':
+            perf_file.write('Hash algorithm:;SHA-256;Data length (bytes):;256\n')
         else:
             perf_file.write(f'Key parameters:;{params}\n')
 

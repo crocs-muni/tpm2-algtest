@@ -165,3 +165,30 @@ TPM2_RC encryptdecrypt(
     }
     return rc;
 }
+
+TPM2_RC hmac(
+        TSS2_SYS_CONTEXT *sapi_context,
+        TPMI_DH_OBJECT handle,
+        const TPM2B_MAX_BUFFER *buffer,
+        TPMI_ALG_HASH hashAlg,
+        double *duration)
+{
+    /* Cmd parameters */
+    TSS2L_SYS_AUTH_COMMAND cmdAuthsArray = prepare_session();
+
+    /* Rsp parameters */
+    TPM2B_DIGEST outHMAC = { .size = 0 };
+    TSS2L_SYS_AUTH_RESPONSE rspAuthsArray;
+
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    TPM2_RC rc = Tss2_Sys_HMAC(sapi_context, handle, &cmdAuthsArray, buffer,
+            hashAlg, &outHMAC, &rspAuthsArray);
+
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    if (duration != NULL) {
+        *duration = get_duration_s(&start, &end);
+    }
+    return rc;
+}

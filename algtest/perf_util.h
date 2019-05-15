@@ -43,3 +43,10 @@ TPM2_RC encryptdecrypt(
         const TPM2B_IV *inIv,
         const TPM2B_MAX_BUFFER *inData,
         double *duration);
+
+TPM2_RC hmac(
+        TSS2_SYS_CONTEXT *sapi_context,
+        TPMI_DH_OBJECT handle,
+        const TPM2B_MAX_BUFFER *buffer,
+        TPMI_ALG_HASH hashAlg,
+        double *duration);
