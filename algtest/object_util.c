@@ -226,6 +226,22 @@ TPM2B_PUBLIC prepare_template_ECC_primary(TPMI_ECC_CURVE curveID)
     return public;
 }
 
+
+/* Create the same primary key for all tests, so that there is no bias when
+ * wrapping child keys */
+TPM2_RC create_primary_ECC_NIST_P256(TSS2_SYS_CONTEXT *sapi_context,
+        TPMI_DH_OBJECT *primary_handle)
+{
+    TPM2B_PUBLIC inPublic = prepare_template_ECC_primary(TPM2_ECC_NIST_P256);
+    TPM2_RC rc = create_primary(sapi_context, &inPublic, primary_handle);
+    if (rc == TPM2_RC_SUCCESS) {
+        log_info("Created ECC NIST P256 primary key");
+        return rc;
+    }
+    log_error("Cannot create ECC NIST P256 primary key! (%04x)", rc);
+    return rc;
+}
+
 TPM2_RC create_some_primary(TSS2_SYS_CONTEXT *sapi_context,
         TPMI_DH_OBJECT *primary_handle)
 {

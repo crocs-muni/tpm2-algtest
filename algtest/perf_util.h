@@ -20,6 +20,7 @@ TPM2_RC rsa_encrypt(
         TSS2_SYS_CONTEXT *sapi_context,
         TPMI_DH_OBJECT keyHandle,
         const TPM2B_PUBLIC_KEY_RSA *message,
+        const TPMT_RSA_DECRYPT *inScheme,
         TPM2B_PUBLIC_KEY_RSA *outData,
         double *duration);
 
@@ -27,6 +28,7 @@ TPM2_RC rsa_decrypt(
         TSS2_SYS_CONTEXT *sapi_context,
         TPMI_DH_OBJECT keyHandle,
         const TPM2B_PUBLIC_KEY_RSA *cipherText,
+        const TPMT_RSA_DECRYPT *inScheme,
         TPM2B_PUBLIC_KEY_RSA *message,
         double *duration);
 

@@ -85,6 +85,17 @@ bool test_detail(
             log_info("Keygen %d: ECC | curve %04x | duration %f | rc %04x",
                     i, scenario->key_params.parameters.eccDetail.curveID,
                     result->data_points[i].duration_s, result->data_points[i].rc);
+            break;
+        case TPM2_ALG_KEYEDHASH:
+            log_info("Keygen %d: KEYEDHASH | duration %f | rc %04x",
+                    i, result->data_points[i].duration_s, result->data_points[i].rc);
+            break;
+        case TPM2_ALG_SYMCIPHER:
+            log_info("Keygen %d: SYMCIPHER | algorithm %04x | keylen %d | duration %f | rc %04x",
+                    i, scenario->key_params.parameters.symDetail.sym.algorithm,
+                    scenario->key_params.parameters.symDetail.sym.keyBits.sym,
+                    result->data_points[i].duration_s, result->data_points[i].rc);
+            break;
         }
 
         if (result->data_points[i].rc != TPM2_RC_SUCCESS) {
@@ -118,6 +129,14 @@ void output_results(
                 scenario->key_params.parameters.eccDetail.curveID);
         snprintf(filename_keys, 256, "Keygen:ECC_0x%04x.csv",
                 scenario->key_params.parameters.eccDetail.curveID);
+        break;
+    case TPM2_ALG_KEYEDHASH:
+        snprintf(filename, 256, "Perf_Create:HMAC.csv");
+        break;
+    case TPM2_ALG_SYMCIPHER:
+        snprintf(filename, 256, "Perf_Create:SYMCIPHER_0x%04x_%d.csv",
+                scenario->key_params.parameters.symDetail.sym.algorithm,
+                scenario->key_params.parameters.symDetail.sym.keyBits.sym);
         break;
     default:
         log_error("Keygen: (output_results) Key type not supported.");
@@ -175,6 +194,9 @@ void output_results(
             }
             fprintf(out, ";%d\n", (int) (result->data_points[i].duration_s * 1000));
         }
+        break;
+    case TPM2_ALG_KEYEDHASH:
+    case TPM2_ALG_SYMCIPHER:
         break;
     default:
         log_error("Keygen (output_results) Key type not supported.");
@@ -247,7 +269,7 @@ void run_keygen_scenarios(
 
     TPMI_DH_OBJECT primary_handle;
     log_info("Keygen: Creating primary key...");
-    TPM2_RC rc = create_some_primary(sapi_context, &primary_handle);
+    TPM2_RC rc = create_primary_ECC_NIST_P256(sapi_context, &primary_handle);
     if (rc != TPM2_RC_SUCCESS) {
         log_error("Keygen: Failed to create primary key!");
         return;

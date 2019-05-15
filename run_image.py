@@ -270,8 +270,8 @@ def write_perf_file(perf_file, detail_dir):
 
         if command == 'GetRandom':
             perf_file.write(f'Data length (bytes):;32\n')
-        elif command in [ 'Sign', 'VerifySignature' ]:
-            perf_file.write(f'Key parameters:;{params[:params.rfind("_")]};Signing scheme:;{params[params.rfind("_")+1:]}\n')
+        elif command in [ 'Sign', 'VerifySignature, RSA_Encrypt, RSA_Decrypt' ]:
+            perf_file.write(f'Key parameters:;{params[:params.rfind("_")]};Scheme:;{params[params.rfind("_")+1:]}\n')
         else:
             perf_file.write(f'Key parameters:;{params}\n')
 

@@ -18,12 +18,14 @@ struct perf_verifysignature_scenario {
 
 struct perf_rsa_encrypt_scenario {
     TPMI_RSA_KEY_BITS keylen;
+    TPMT_RSA_DECRYPT scheme;
     TPM2B_PUBLIC_KEY_RSA message;
 };
 
 struct perf_rsa_decrypt_scenario {
     TPMI_RSA_KEY_BITS keylen;
-    TPM2B_PUBLIC_KEY_RSA ciphertext;
+    TPMT_RSA_DECRYPT scheme;
+    TPM2B_PUBLIC_KEY_RSA message;
 };
 
 struct perf_scenario {

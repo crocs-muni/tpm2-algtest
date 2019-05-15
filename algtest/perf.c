@@ -81,9 +81,11 @@ void output_results(
     case TPM2_CC_VerifySignature:
         fn_valid = get_csv_filename_verifysignature(&scenario->verifysignature, filename); break;
     case TPM2_CC_RSA_Encrypt:
-        snprintf(filename, 256, "Perf_RSA_Encrypt:RSA_%d.csv", scenario->rsa_encrypt.keylen); break;
+        snprintf(filename, 256, "Perf_RSA_Encrypt:RSA_%d_0x%04x.csv",
+                scenario->rsa_encrypt.keylen, scenario->rsa_encrypt.scheme.scheme); break;
     case TPM2_CC_RSA_Decrypt:
-        snprintf(filename, 256, "Perf_RSA_Decrypt:RSA_%d.csv", scenario->rsa_decrypt.keylen); break;
+        snprintf(filename, 256, "Perf_RSA_Decrypt:RSA_%d_0x%04x.csv",
+                scenario->rsa_decrypt.keylen, scenario->rsa_decrypt.scheme.scheme); break;
     case TPM2_CC_GetRandom:
         snprintf(filename, 256, "Perf_GetRandom.csv"); break;
     default:
@@ -251,11 +253,12 @@ bool run_perf_rsa_encrypt(
 
         TPM2B_PUBLIC_KEY_RSA outData;
         result->data_points[i].rc = rsa_encrypt(sapi_context, object_handle,
-                &scenario->rsa_encrypt.message, &outData,
-                &result->data_points[i].duration_s);
+                &scenario->rsa_encrypt.message, &scenario->rsa_encrypt.scheme,
+                &outData, &result->data_points[i].duration_s);
         ++result->size;
-        log_info("Perf rsa_encrypt: %d: keybits %d | duration %f | rc %04x",
-                i, scenario->rsa_encrypt.keylen, result->data_points[i].duration_s,
+        log_info("Perf rsa_encrypt: %d: scheme: %04x | keybits %d | duration %f | rc %04x",
+                i, scenario->rsa_encrypt.scheme.scheme,
+                scenario->rsa_encrypt.keylen, result->data_points[i].duration_s,
                 result->data_points[i].rc);
     }
     Tss2_Sys_FlushContext(sapi_context, object_handle);
@@ -282,8 +285,9 @@ bool run_perf_rsa_decrypt(
         return false;
     }
 
-    TPM2B_PUBLIC_KEY_RSA ciphertext = { .size = scenario->rsa_decrypt.keylen / 8 };
-    memset(&ciphertext.buffer, 0x00, ciphertext.size);
+    TPM2B_PUBLIC_KEY_RSA ciphertext = { .size = 0 };
+    rsa_encrypt(sapi_context, object_handle, &scenario->rsa_decrypt.message,
+            &scenario->rsa_decrypt.scheme, &ciphertext, NULL);
 
     result->size = 0;
     struct timespec start, end;
@@ -297,11 +301,12 @@ bool run_perf_rsa_decrypt(
 
         TPM2B_PUBLIC_KEY_RSA decrypted_message;
         result->data_points[i].rc = rsa_decrypt(sapi_context, object_handle,
-                &ciphertext, &decrypted_message,
+                &ciphertext, &scenario->rsa_decrypt.scheme, &decrypted_message,
                 &result->data_points[i].duration_s);
         ++result->size;
-        log_info("Perf rsa_decrypt: %d: keybits %d | duration %f | rc %04x",
-                i, scenario->rsa_decrypt.keylen, result->data_points[i].duration_s,
+        log_info("Perf rsa_decrypt: %d: scheme %04x | keybits %d | duration %f | rc %04x",
+                i, scenario->rsa_decrypt.scheme.scheme,
+                scenario->rsa_decrypt.keylen, result->data_points[i].duration_s,
                 result->data_points[i].rc);
     }
     Tss2_Sys_FlushContext(sapi_context, object_handle);
@@ -382,7 +387,7 @@ void run_perf_scenarios(
 
     TPMI_DH_OBJECT primary_handle;
     log_info("Perf: Creating primary key...");
-    TPM2_RC rc = create_some_primary(sapi_context, &primary_handle);
+    TPM2_RC rc = create_primary_ECC_NIST_P256(sapi_context, &primary_handle);
     if (rc != TPM2_RC_SUCCESS) {
         log_error("Perf: Failed to create primary key!");
         return;
@@ -398,7 +403,7 @@ void run_perf_scenarios(
             .digest = { .size = 32 }, // Using SHA256
         };
         memset(&scenario.sign.digest.buffer, 0x00, scenario.sign.digest.size);
-        while (get_next_key_params(&scenario.sign.key_params)) {
+        while (get_next_asym_key_params(&scenario.sign.key_params)) {
             while (get_next_sign_scheme(&scenario.sign.scheme, scenario.sign.key_params.type)) {
                 run_perf_on_primary(sapi_context, &scenario, primary_handle);
             }
@@ -414,10 +419,10 @@ void run_perf_scenarios(
             .digest = { .size = 32 }, // Using SHA256
         };
         memset(&scenario.verifysignature.digest.buffer, 0x00, scenario.verifysignature.digest.size);
-        while (get_next_key_params(&scenario.verifysignature.key_params)) {
-            while (get_next_sign_scheme(&scenario.verifysignature.scheme, scenario.verifysignature.key_params.type)) {
+        while (get_next_asym_key_params(&scenario.verifysignature.key_params)) {
+            do {
                 run_perf_on_primary(sapi_context, &scenario, primary_handle);
-            }
+            } while (get_next_sign_scheme(&scenario.verifysignature.scheme, scenario.verifysignature.key_params.type));
             scenario.verifysignature.scheme.scheme = TPM2_ALG_NULL;
         }
     }
@@ -430,7 +435,10 @@ void run_perf_scenarios(
         };
         memset(&scenario.rsa_encrypt.message.buffer, 0x00, scenario.rsa_encrypt.message.size);
         while (get_next_rsa_keylen(&scenario.rsa_encrypt.keylen)) {
-            run_perf_on_primary(sapi_context, &scenario, primary_handle);
+            do {
+                run_perf_on_primary(sapi_context, &scenario, primary_handle);
+            } while (get_next_rsa_enc_scheme(&scenario.rsa_encrypt.scheme));
+            scenario.rsa_encrypt.scheme.scheme = TPM2_ALG_NULL;
         }
     }
 
@@ -438,11 +446,14 @@ void run_perf_scenarios(
         scenario.command_code = TPM2_CC_RSA_Decrypt;
         scenario.rsa_decrypt = (struct perf_rsa_decrypt_scenario) {
             .keylen = 0,
-            .ciphertext = { .size = 64 },
+            .message = { .size = 64 },
         };
-        memset(&scenario.rsa_decrypt.ciphertext.buffer, 0x00, scenario.rsa_decrypt.ciphertext.size);
+        memset(&scenario.rsa_decrypt.message.buffer, 0x00, scenario.rsa_decrypt.message.size);
         while (get_next_rsa_keylen(&scenario.rsa_decrypt.keylen)) {
-            run_perf_on_primary(sapi_context, &scenario, primary_handle);
+            do {
+                run_perf_on_primary(sapi_context, &scenario, primary_handle);
+            } while (get_next_rsa_enc_scheme(&scenario.rsa_decrypt.scheme));
+            scenario.rsa_decrypt.scheme.scheme = TPM2_ALG_NULL;
         }
     }
 
