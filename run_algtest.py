@@ -16,9 +16,13 @@ def zip(outdir):
         for file in files:
             zipf.write(os.path.join(root, file))
 
-def quicktest(detail_dir):
-    run_command = ['docker', 'run', '-it', '--init', '--device=' + device,
-            '--entrypoint=tpm2_getcap', 'simonstruk/tpm2-algtest:' + image_tag ]
+def quicktest(args, detail_dir):
+    if args.docker:
+        run_command = [ 'docker', 'run', '-it', '--init', '--device=' + device,
+                '--entrypoint=tpm2_getcap', 'simonstruk/tpm2-algtest:' + image_tag ]
+    else:
+        run_command = [ 'sudo', 'tpm2_getcap' ]
+    run_command += [ '-T', 'device' ]
 
     print('Running quicktest...')
     with open(os.path.join(detail_dir, 'Quicktest_algorithms.txt'), 'w') as outfile:
@@ -53,7 +57,7 @@ def add_args(run_command, args):
     if args.command:
         run_command += [ '-c', args.command ]
 
-def run_image(run_command, logfile):
+def run_algtest(run_command, logfile):
     proc = subprocess.Popen(run_command, stdout=subprocess.PIPE, universal_newlines=True)
     for line in proc.stdout:
         sys.stdout.write(line + '\r')
@@ -119,14 +123,18 @@ def compute_rsa_privates(filename):
 
 def keygen(args):
     detail_dir = os.path.join(args.outdir, 'detail')
-    run_command = [ 'docker', 'run', '-it', '--init', '--device=' + device,
-            '--volume=' + os.path.join(os.getcwd(), detail_dir) + ':/tpm2-algtest/build/out:z',
-            'simonstruk/tpm2-algtest:' + image_tag, '-T', 'device', '-s', 'keygen' ]
+    if args.docker:
+        run_command = [ 'docker', 'run', '-it', '--init', '--device=' + device,
+                '--volume=' + os.path.join(os.getcwd(), detail_dir) + ':/tpm2-algtest/build/out:z',
+                'simonstruk/tpm2-algtest:' + image_tag ]
+    else:
+        run_command = [ 'sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir ]
+    run_command += ['-T', 'device', '-s', 'keygen' ]
     add_args(run_command, args)
 
     print('Running keygen test...')
     with open(os.path.join(detail_dir, 'keygen_log.txt'), 'w') as logfile:
-        run_image(run_command, logfile)
+        run_algtest(run_command, logfile)
 
     print('Computing RSA private keys...')
     for filename in glob.glob(os.path.join(detail_dir, 'Keygen_RSA_*_keys.csv')):
@@ -135,14 +143,18 @@ def keygen(args):
 
 def perf(args):
     detail_dir = os.path.join(args.outdir, 'detail')
-    run_command = [ 'docker', 'run', '-it', '--init', '--device=' + device,
-            '--volume=' + os.path.join(os.getcwd(), detail_dir) + ':/tpm2-algtest/build/out:z',
-            'simonstruk/tpm2-algtest:' + image_tag, '-T', 'device', '-s', 'perf' ]
+    if args.docker:
+        run_command = [ 'docker', 'run', '-it', '--init', '--device=' + device,
+                '--volume=' + os.path.join(os.getcwd(), detail_dir) + ':/tpm2-algtest/build/out:z',
+                'simonstruk/tpm2-algtest:' + image_tag ]
+    else:
+        run_command = [ 'sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir ]
+    run_command += ['-T', 'device', '-s', 'perf' ]
     add_args(run_command, args)
 
     print('Running perf test...')
     with open(os.path.join(detail_dir, 'perf_log.txt'), 'w') as logfile:
-        run_image(run_command, logfile)
+        run_algtest(run_command, logfile)
 
 def get_tpm_id(detail_dir):
     def get_val(line):
@@ -316,6 +328,7 @@ def main():
     parser.add_argument('-C', '--curveid', type=lambda x: int(x, 0), required=False)
     parser.add_argument('-c', '--command', type=str, required=False)
     parser.add_argument('-o', '--outdir', type=str, required=False, default='out')
+    parser.add_argument('--docker', action='store_true')
     args = parser.parse_args()
 
     if not os.path.exists(device):
@@ -327,7 +340,7 @@ def main():
     detail_dir = os.path.join(args.outdir, 'detail')
     if args.test == 'quicktest':
         os.makedirs(detail_dir, exist_ok=True)
-        quicktest(detail_dir)
+        quicktest(args, detail_dir)
         zip(args.outdir)
     elif args.test == 'keygen':
         os.makedirs(detail_dir, exist_ok=True)
@@ -339,9 +352,9 @@ def main():
         zip(args.outdir)
     elif args.test == 'fulltest':
         os.makedirs(detail_dir, exist_ok=True)
-        with open(os.path.join(detail_dir, 'docker_info.txt'), 'w') as f:
-            f.write('image ' + image_tag)
-        quicktest(detail_dir)
+        with open(os.path.join(detail_dir, 'image_tag.txt'), 'w') as f:
+            f.write(image_tag)
+        quicktest(args, detail_dir)
         keygen(args)
         perf(args)
         create_result_files(args.outdir)
@@ -354,7 +367,7 @@ def main():
         create_result_files(args.outdir)
         zip(args.outdir)
     else:
-        print('invalid test type, needs to be one of: fulltest, quicktest, keygen, perf')
+        print('invalid test type, needs to be one of: fulltest, quicktest, keygen, perf, format')
 
 if __name__ == '__main__':
     main()

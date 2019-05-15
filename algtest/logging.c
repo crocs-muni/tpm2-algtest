@@ -14,9 +14,9 @@ void log_info(const char* format, ...)
 
     va_list args;
     va_start(args, format);
-    fprintf(stderr, "INFO: ");
-    vfprintf(stderr, format, args);
-    fprintf(stderr, "\n");
+    fprintf(stdout, "INFO: ");
+    vfprintf(stdout, format, args);
+    fprintf(stdout, "\n");
     va_end(args);
 }
 
@@ -28,9 +28,9 @@ void log_warning(const char* format, ...)
 
     va_list args;
     va_start(args, format);
-    fprintf(stderr, "WARNING: ");
-    vfprintf(stderr, format, args);
-    fprintf(stderr, "\n");
+    fprintf(stdout, "WARNING: ");
+    vfprintf(stdout, format, args);
+    fprintf(stdout, "\n");
     va_end(args);
 }
 
@@ -42,8 +42,8 @@ void log_error(const char* format, ...)
 
     va_list args;
     va_start(args, format);
-    fprintf(stderr, "ERROR: ");
-    vfprintf(stderr, format, args);
-    fprintf(stderr, "\n");
+    fprintf(stdout, "ERROR: ");
+    vfprintf(stdout, format, args);
+    fprintf(stdout, "\n");
     va_end(args);
 }
