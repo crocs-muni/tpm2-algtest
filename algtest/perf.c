@@ -89,8 +89,11 @@ void output_results(
     case TPM2_CC_GetRandom:
         snprintf(filename, 256, "Perf_GetRandom.csv"); break;
     case TPM2_CC_EncryptDecrypt:
-        snprintf(filename, 256, "Perf_EncryptDecrypt:0x%04x_%d.csv",
-                scenario->encryptdecrypt.sym.algorithm, scenario->encryptdecrypt.sym.keyBits);
+        snprintf(filename, 256, "Perf_EncryptDecrypt:0x%04x_%d_0x%04x_%s.csv",
+                scenario->encryptdecrypt.sym.algorithm,
+                scenario->encryptdecrypt.sym.keyBits.sym,
+                scenario->encryptdecrypt.sym.mode.sym,
+                scenario->encryptdecrypt.decrypt ? "decrypt" : "encrypt");
         break;
     default:
         log_error("Perf: (output_results) Command not supported.");
@@ -333,6 +336,7 @@ bool run_perf_encryptdecrypt(
     };
 
     TPM2B_PUBLIC inPublic = prepare_template(&key_params);
+    inPublic.publicArea.objectAttributes |= TPMA_OBJECT_DECRYPT;
 
     TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
     if (rc != TPM2_RC_SUCCESS) {
@@ -347,7 +351,10 @@ bool run_perf_encryptdecrypt(
         return false;
     }
 
-    TPM2B_IV inIv = { .size = scenario->encryptdecrypt.sym.keyBits.sym / 8 };
+    TPM2B_IV inIv = {
+        .size = scenario->encryptdecrypt.sym.mode.sym == TPM2_ALG_ECB
+            ? 0 : scenario->encryptdecrypt.sym.keyBits.sym / 8
+    };
     memset(&inIv.buffer, 0x00, inIv.size);
     TPM2B_MAX_BUFFER inData = { .size = 256 };
     memset(&inData.buffer, 0x00, inData.size);
@@ -363,11 +370,15 @@ bool run_perf_encryptdecrypt(
         }
 
         result->data_points[i].rc = encryptdecrypt(sapi_context, object_handle,
-                &inIv, &inData, &result->data_points[i].duration_s);
+                scenario->encryptdecrypt.decrypt, &inIv, &inData,
+                &result->data_points[i].duration_s);
         ++result->size;
 
-        log_info("Perf encryptdecrypt %d: algorithm %04x | keybits %d | duration %f | rc %04x",
-            i, scenario->encryptdecrypt.sym.algorithm, scenario->encryptdecrypt.sym.keyBits,
+        log_info("Perf encryptdecrypt %d: algorithm %04x | keybits %d | mode %04x | %s | duration %f | rc %04x",
+            i, scenario->encryptdecrypt.sym.algorithm,
+            scenario->encryptdecrypt.sym.keyBits,
+            scenario->encryptdecrypt.sym.mode,
+            scenario->encryptdecrypt.decrypt ? "decrypt" : "encrypt",
             result->data_points[i].duration_s, result->data_points[i].rc);
     }
     Tss2_Sys_FlushContext(sapi_context, object_handle);
@@ -536,7 +547,13 @@ void run_perf_scenarios(
             },
         };
         while (get_next_symcipher(&scenario.encryptdecrypt.sym)) {
-            run_perf_on_primary(sapi_context, &scenario, primary_handle);
+            while (get_next_sym_mode(&scenario.encryptdecrypt.sym.mode.sym)) {
+                scenario.encryptdecrypt.decrypt = TPM2_NO;
+                run_perf_on_primary(sapi_context, &scenario, primary_handle);
+                scenario.encryptdecrypt.decrypt = TPM2_YES;
+                run_perf_on_primary(sapi_context, &scenario, primary_handle);
+            }
+            scenario.encryptdecrypt.sym.mode.sym = TPM2_ALG_NULL;
         }
     }
 

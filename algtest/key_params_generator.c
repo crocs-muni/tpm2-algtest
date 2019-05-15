@@ -69,6 +69,24 @@ bool get_next_asym_key_type(TPMT_PUBLIC_PARMS *key_params)
     }
 }
 
+bool get_next_sym_mode(TPMI_ALG_SYM_MODE *mode)
+{
+    switch (*mode) {
+    case TPM2_ALG_NULL:
+        *mode = TPM2_ALG_CTR; return true;
+    case TPM2_ALG_CTR:
+        *mode = TPM2_ALG_OFB; return true;
+    case TPM2_ALG_OFB:
+        *mode = TPM2_ALG_CBC; return true;
+    case TPM2_ALG_CBC:
+        *mode = TPM2_ALG_CFB; return true;
+    case TPM2_ALG_CFB:
+        *mode = TPM2_ALG_ECB; return true;
+    default:
+        return false;
+    }
+}
+
 bool get_next_sym_key_type(TPMT_PUBLIC_PARMS *key_params)
 {
     switch (key_params->type) {

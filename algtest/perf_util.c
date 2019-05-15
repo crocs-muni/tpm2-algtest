@@ -140,6 +140,7 @@ TPM2_RC getrandom(
 TPM2_RC encryptdecrypt(
         TSS2_SYS_CONTEXT *sapi_context,
         TPMI_DH_OBJECT keyHandle,
+        TPMI_YES_NO decrypt,
         const TPM2B_IV *inIv,
         const TPM2B_MAX_BUFFER *inData,
         double *duration)
@@ -156,7 +157,7 @@ TPM2_RC encryptdecrypt(
     clock_gettime(CLOCK_MONOTONIC, &start);
 
     TPM2_RC rc = Tss2_Sys_EncryptDecrypt(sapi_context, keyHandle, &cmdAuthsArray,
-            TPM2_NO, TPM2_ALG_CBC, inIv, inData, &outData, &outIv, &rspAuthsArray);
+            decrypt, TPM2_ALG_NULL, inIv, inData, &outData, &outIv, &rspAuthsArray);
 
     clock_gettime(CLOCK_MONOTONIC, &end);
     if (duration != NULL) {

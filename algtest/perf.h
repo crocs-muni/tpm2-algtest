@@ -30,6 +30,7 @@ struct perf_rsa_decrypt_scenario {
 
 struct perf_encryptdecrypt_scenario {
     TPMT_SYM_DEF_OBJECT sym;
+    TPMI_YES_NO decrypt;
 };
 
 struct perf_scenario {

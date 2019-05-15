@@ -13,3 +13,5 @@ bool get_next_rsa_enc_scheme(TPMT_RSA_DECRYPT *scheme);
 bool get_next_rsa_keylen(TPMI_RSA_KEY_BITS *keylen);
 
 bool get_next_symcipher(TPMT_SYM_DEF_OBJECT *sym);
+
+bool get_next_sym_mode(TPMI_ALG_SYM_MODE *mode);

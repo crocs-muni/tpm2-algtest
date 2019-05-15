@@ -39,6 +39,7 @@ TPM2_RC getrandom(
 TPM2_RC encryptdecrypt(
         TSS2_SYS_CONTEXT *sapi_context,
         TPMI_DH_OBJECT keyHandle,
+        TPMI_YES_NO decrypt,
         const TPM2B_IV *inIv,
         const TPM2B_MAX_BUFFER *inData,
         double *duration);

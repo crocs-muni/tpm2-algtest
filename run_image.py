@@ -188,6 +188,7 @@ def write_header(file, manufacturer, vendor_str, fw):
 def compute_stats(infile, *, rsa2048=False):
     ignore = 5 if rsa2048 else 0
     success, fail, sum_op, min_op, max_op, avg_op = 0, 0, 0, 10000000000, 0, 0
+    error = None
     for line in infile:
         if line.startswith('duration'):
             continue
@@ -195,9 +196,12 @@ def compute_stats(infile, *, rsa2048=False):
             ignore -= 1
             continue
         t, rc = line.split(',')[:2]
-        if '0000' in rc:
+        rc = rc.replace(' ', '')
+        rc = rc.replace('\n', '')
+        if rc == '0000':
             success += 1
         else:
+            error = rc
             fail += 1
             continue
         t = float(t)
@@ -209,7 +213,8 @@ def compute_stats(infile, *, rsa2048=False):
         avg_op = (sum_op / success)
     else:
         min_op = 0
-    return avg_op * 1000, min_op * 1000, max_op * 1000, total, success, fail # sec -> ms
+
+    return avg_op * 1000, min_op * 1000, max_op * 1000, total, success, fail, error # sec -> ms
 
 def write_support_file(support_file, detail_dir):
         qt_properties = os.path.join(detail_dir, 'Quicktest_properties-fixed.txt')
@@ -272,13 +277,16 @@ def write_perf_file(perf_file, detail_dir):
             perf_file.write(f'Data length (bytes):;32\n')
         elif command in [ 'Sign', 'VerifySignature, RSA_Encrypt, RSA_Decrypt' ]:
             perf_file.write(f'Key parameters:;{params[:params.rfind("_")]};Scheme:;{params[params.rfind("_")+1:]}\n')
+        elif command == 'EncryptDecrypt':
+            p = params.split('_')
+            perf_file.write(f'Algorithm:;{p[0]};Key length:;{p[1]};Mode:;{p[2]};Encrypt/decrypt?:;{p[3]};Data length (bytes):;256\n')
         else:
             perf_file.write(f'Key parameters:;{params}\n')
 
         with open(filepath, 'r') as infile:
-            avg_op, min_op, max_op, total, success, fail = compute_stats(infile)
+            avg_op, min_op, max_op, total, success, fail, error = compute_stats(infile)
             perf_file.write(f'operation stats (ms/op):;avg op:;{avg_op:.2f};min op:;{min_op:.2f};max op:;{max_op:.2f}\n')
-            perf_file.write(f'operation info:;total iterations:;{total};successful;{success};failed;{fail}\n\n')
+            perf_file.write(f'operation info:;total iterations:;{total};successful:;{success};failed:;{fail};error:;{"None" if not error else error}\n\n')
 
 def create_result_files(outdir):
     detail_dir = os.path.join(outdir, 'detail')
