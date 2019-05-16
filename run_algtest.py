@@ -8,7 +8,7 @@ import csv
 import datetime
 
 device = '/dev/tpm0'
-image_tag = 'v0.8'
+image_tag = 'v1.0'
 
 def zip(outdir):
     zipf = zipfile.ZipFile(outdir + '.zip', 'w', zipfile.ZIP_DEFLATED)
@@ -288,7 +288,7 @@ def write_perf_file(perf_file, detail_dir):
         if command == 'GetRandom':
             perf_file.write(f'Data length (bytes):;32\n')
         elif command in [ 'Sign', 'VerifySignature, RSA_Encrypt, RSA_Decrypt' ]:
-            perf_file.write(f'Key parameters:;{params[0]};Scheme:;{params[1]}\n')
+            perf_file.write(f'Key parameters:;{params[0]} {params[1]};Scheme:;{params[2]}\n')
         elif command == 'EncryptDecrypt':
             perf_file.write(f'Algorithm:;{params[0]};Key length:;{params[1]};Mode:;{params[2]};Encrypt/decrypt?:;{params[3]};Data length (bytes):;256\n')
         elif command == 'HMAC':
@@ -296,7 +296,7 @@ def write_perf_file(perf_file, detail_dir):
         elif command == 'Hash':
             perf_file.write(f'Hash algorithm:;{params[0]};Data length (bytes):;256\n')
         else:
-            perf_file.write(f'Key parameters:;{params[0]}\n')
+            perf_file.write(f'Key parameters:;{" ".join(params)}\n')
 
         with open(filepath, 'r') as infile:
             avg_op, min_op, max_op, total, success, fail, error = compute_stats(infile)
