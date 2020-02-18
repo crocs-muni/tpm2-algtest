@@ -739,6 +739,8 @@ unsigned long count_supported_perf_scenarios(
             }
         }
     }
+
+    return total;
 }
 
 void run_perf_scenarios(
