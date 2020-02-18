@@ -27,6 +27,7 @@ set(SOURCES
     ${LIB_SRC}/tpm2_tcti_ldr.c
     ${LIB_SRC}/tpm2_util.c
     ${LIB_SRC}/tpm_kdfa.c
+    ${LIB_SRC}/status.c
     ${TOOLS_SRC}/tpm2_tool.c
     ${TOOLS_SRC}/tpm2_algtest.c
     ${ALGTEST_SRC}/util.c
