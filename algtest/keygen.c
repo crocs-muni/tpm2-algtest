@@ -110,7 +110,6 @@ bool test_detail(
         }
 
 	prog->current++;
-	printf("%lu/%lu\n", prog->current, prog->total);
 	printf("%lu%%\n", get_progress_percentage(prog));
     }
     return true;

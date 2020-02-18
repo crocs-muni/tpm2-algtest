@@ -4,6 +4,7 @@
 #include "util.h"
 #include "perf_util.h"
 #include "key_params_generator.h"
+#include "status.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -119,7 +120,8 @@ bool run_perf_sign(
         TSS2_SYS_CONTEXT *sapi_context,
         const struct perf_scenario *scenario,
         TPMI_DH_OBJECT primary_handle,
-        struct perf_result *result)
+        struct perf_result *result,
+        struct progress *prog)
 {
     TPM2B_PUBLIC inPublic = prepare_template(&scenario->sign.key_params);
 
@@ -164,6 +166,8 @@ bool run_perf_sign(
                     scenario->sign.key_params.parameters.eccDetail.curveID,
                     result->data_points[i].duration_s, result->data_points[i].rc);
         }
+
+	printf("%lu%%\n", inc_and_get_progress_percentage(prog));
     }
 
     Tss2_Sys_FlushContext(sapi_context, object_handle);
@@ -174,7 +178,8 @@ bool run_perf_verifysignature(
         TSS2_SYS_CONTEXT *sapi_context,
         const struct perf_scenario *scenario,
         TPMI_DH_OBJECT primary_handle,
-        struct perf_result *result)
+        struct perf_result *result,
+        struct progress *prog)
 {
     TPM2B_PUBLIC inPublic = prepare_template(&scenario->verifysignature.key_params);
 
@@ -229,6 +234,8 @@ bool run_perf_verifysignature(
                     scenario->verifysignature.key_params.parameters.eccDetail.curveID,
                     result->data_points[i].duration_s, result->data_points[i].rc);
         }
+
+	printf("%lu%%\n", inc_and_get_progress_percentage(prog));
     }
     Tss2_Sys_FlushContext(sapi_context, object_handle);
     return true;
@@ -238,7 +245,8 @@ bool run_perf_rsa_encrypt(
         TSS2_SYS_CONTEXT* sapi_context,
         const struct perf_scenario *scenario,
         TPMI_DH_OBJECT primary_handle,
-        struct perf_result *result)
+        struct perf_result *result,
+        struct progress *prog)
 {
     TPM2B_PUBLIC inPublic = prepare_template_RSA(scenario->rsa_encrypt.keylen);
     TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
@@ -273,6 +281,7 @@ bool run_perf_rsa_encrypt(
                 i, scenario->rsa_encrypt.scheme.scheme,
                 scenario->rsa_encrypt.keylen, result->data_points[i].duration_s,
                 result->data_points[i].rc);
+	printf("%lu%%\n", inc_and_get_progress_percentage(prog));
     }
     Tss2_Sys_FlushContext(sapi_context, object_handle);
     return true;
@@ -282,7 +291,8 @@ bool run_perf_rsa_decrypt(
         TSS2_SYS_CONTEXT* sapi_context,
         const struct perf_scenario *scenario,
         TPMI_DH_OBJECT primary_handle,
-        struct perf_result *result)
+        struct perf_result *result,
+        struct progress *prog)
 {
     TPM2B_PUBLIC inPublic = prepare_template_RSA(scenario->rsa_decrypt.keylen);
     TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
@@ -321,6 +331,7 @@ bool run_perf_rsa_decrypt(
                 i, scenario->rsa_decrypt.scheme.scheme,
                 scenario->rsa_decrypt.keylen, result->data_points[i].duration_s,
                 result->data_points[i].rc);
+	printf("%lu%%\n", inc_and_get_progress_percentage(prog));
     }
     Tss2_Sys_FlushContext(sapi_context, object_handle);
     return true;
@@ -330,7 +341,8 @@ bool run_perf_encryptdecrypt(
         TSS2_SYS_CONTEXT *sapi_context,
         const struct perf_scenario *scenario,
         TPMI_DH_OBJECT primary_handle,
-        struct perf_result *result)
+        struct perf_result *result,
+        struct progress *prog)
 {
     TPMT_PUBLIC_PARMS key_params = {
         .type = TPM2_ALG_SYMCIPHER,
@@ -386,6 +398,7 @@ bool run_perf_encryptdecrypt(
                 scenario->encryptdecrypt.sym.mode,
                 scenario->encryptdecrypt.decrypt ? "decrypt" : "encrypt",
                 result->data_points[i].duration_s, result->data_points[i].rc);
+	printf("%lu%%\n", inc_and_get_progress_percentage(prog));
     }
     Tss2_Sys_FlushContext(sapi_context, object_handle);
     return true;
@@ -395,7 +408,8 @@ bool run_perf_hmac(
         TSS2_SYS_CONTEXT *sapi_context,
         const struct perf_scenario *scenario,
         TPMI_DH_OBJECT primary_handle,
-        struct perf_result *result)
+        struct perf_result *result,
+        struct progress *prog)
 {
     TPMT_PUBLIC_PARMS key_params = {
         .type = TPM2_ALG_KEYEDHASH,
@@ -442,6 +456,7 @@ bool run_perf_hmac(
 
         log_info("Perf hmac %d: duration %f | rc %04x",
                 i, result->data_points[i].duration_s, result->data_points[i].rc);
+	printf("%lu%%\n", inc_and_get_progress_percentage(prog));
     }
 
     Tss2_Sys_FlushContext(sapi_context, object_handle);
@@ -451,7 +466,8 @@ bool run_perf_hmac(
 void run_perf_on_primary(
         TSS2_SYS_CONTEXT *sapi_context,
         const struct perf_scenario *scenario,
-        TPMI_DH_OBJECT primary_handle)
+        TPMI_DH_OBJECT primary_handle,
+        struct progress *prog)
 {
     struct perf_result result;
     if (!alloc_result(scenario, &result)) {
@@ -462,22 +478,22 @@ void run_perf_on_primary(
     bool ok;
     switch (scenario->command_code) {
     case TPM2_CC_Sign:
-        ok = run_perf_sign(sapi_context, scenario, primary_handle, &result);
+        ok = run_perf_sign(sapi_context, scenario, primary_handle, &result, prog);
         break;
     case TPM2_CC_VerifySignature:
-        ok = run_perf_verifysignature(sapi_context, scenario, primary_handle, &result);
+        ok = run_perf_verifysignature(sapi_context, scenario, primary_handle, &result, prog);
         break;
     case TPM2_CC_RSA_Encrypt:
-        ok = run_perf_rsa_encrypt(sapi_context, scenario, primary_handle, &result);
+        ok = run_perf_rsa_encrypt(sapi_context, scenario, primary_handle, &result, prog);
         break;
     case TPM2_CC_RSA_Decrypt:
-        ok = run_perf_rsa_decrypt(sapi_context, scenario, primary_handle, &result);
+        ok = run_perf_rsa_decrypt(sapi_context, scenario, primary_handle, &result, prog);
         break;
     case TPM2_CC_EncryptDecrypt:
-        ok = run_perf_encryptdecrypt(sapi_context, scenario, primary_handle, &result);
+        ok = run_perf_encryptdecrypt(sapi_context, scenario, primary_handle, &result, prog);
         break;
     case TPM2_CC_HMAC:
-        ok = run_perf_hmac(sapi_context, scenario, primary_handle, &result);
+        ok = run_perf_hmac(sapi_context, scenario, primary_handle, &result, prog);
         break;
     default:
         log_warning("Perf: unsupported command code %04x", scenario->command_code);
@@ -491,7 +507,8 @@ void run_perf_on_primary(
 
 void run_perf_getrandom(
         TSS2_SYS_CONTEXT *sapi_context,
-        const struct perf_scenario *scenario)
+        const struct perf_scenario *scenario,
+        struct progress *prog)
 {
     struct perf_result result;
     if (!alloc_result(scenario, &result)) {
@@ -512,6 +529,7 @@ void run_perf_getrandom(
         ++result.size;
         log_info("Perf getrandom: %d: duration %f | rc %04x",
                 i, result.data_points[i].duration_s, result.data_points[i].rc);
+	printf("%lu%%\n", inc_and_get_progress_percentage(prog));
     }
 
     output_results(scenario, &result);
@@ -520,7 +538,8 @@ void run_perf_getrandom(
 
 void run_perf_hash(
         TSS2_SYS_CONTEXT *sapi_context,
-        const struct perf_scenario *scenario)
+        const struct perf_scenario *scenario,
+        struct progress *prog)
 {
     TPM2B_MAX_BUFFER data = { .size = 256 };
     memset(&data.buffer, 0x00, data.size);
@@ -552,10 +571,174 @@ void run_perf_hash(
         log_info("Perf hash: %d: algorithm %04x | duration %f | rc %04x",
                 i, scenario->hash.hash_alg, result.data_points[i].duration_s,
                 result.data_points[i].rc);
+	printf("%lu%%\n", inc_and_get_progress_percentage(prog));
     }
 
     output_results(scenario, &result);
     free_result(&result);
+}
+
+unsigned long count_supported_perf_scenarios(
+        TSS2_SYS_CONTEXT *sapi_context,
+        const struct scenario_parameters *parameters)
+{
+    struct perf_scenario scenario = {
+        .parameters = *parameters,
+    };
+    unsigned long total = 0;
+
+    if (command_in_options("sign")) {
+        scenario.command_code = TPM2_CC_Sign;
+        scenario.sign = (struct perf_sign_scenario) {
+            .key_params = { .type = TPM2_ALG_NULL },
+            .scheme = { .scheme = TPM2_ALG_NULL },
+            .digest = { .size = 32 }, // Using SHA256
+        };
+        memset(&scenario.sign.digest.buffer, 0x00, scenario.sign.digest.size);
+        while (get_next_asym_key_params(&scenario.sign.key_params)) {
+            while (get_next_sign_scheme(&scenario.sign.scheme, scenario.sign.key_params.type)) {
+                TPM2B_PUBLIC inPublic = prepare_template(&scenario.sign.key_params);
+
+                TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
+                if (rc == TPM2_RC_SUCCESS) {
+                    total += scenario.parameters.repetitions;
+                }
+            }
+            scenario.sign.scheme.scheme = TPM2_ALG_NULL;
+        }
+    }
+
+    if (command_in_options("verifysignature")) {
+        scenario.command_code = TPM2_CC_VerifySignature;
+        scenario.verifysignature = (struct perf_verifysignature_scenario) {
+            .key_params = { .type = TPM2_ALG_NULL },
+            .scheme = { .scheme = TPM2_ALG_NULL },
+            .digest = { .size = 32 }, // Using SHA256
+        };
+        memset(&scenario.verifysignature.digest.buffer, 0x00, scenario.verifysignature.digest.size);
+        while (get_next_asym_key_params(&scenario.verifysignature.key_params)) {
+            do {
+                TPM2B_PUBLIC inPublic = prepare_template(&scenario.verifysignature.key_params);
+
+                TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
+                if (rc == TPM2_RC_SUCCESS) {
+                    total += scenario.parameters.repetitions;
+                }
+            } while (get_next_sign_scheme(&scenario.verifysignature.scheme, scenario.verifysignature.key_params.type));
+            scenario.verifysignature.scheme.scheme = TPM2_ALG_NULL;
+        }
+    }
+
+    if (command_in_options("rsa_encrypt")) {
+        scenario.command_code = TPM2_CC_RSA_Encrypt;
+        scenario.rsa_encrypt = (struct perf_rsa_encrypt_scenario) {
+            .keylen = 0,
+            .message = { .size = 64 },
+        };
+        memset(&scenario.rsa_encrypt.message.buffer, 0x00, scenario.rsa_encrypt.message.size);
+        while (get_next_rsa_keylen(&scenario.rsa_encrypt.keylen)) {
+            do {
+                TPM2B_PUBLIC inPublic = prepare_template_RSA(scenario.rsa_encrypt.keylen);
+                TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
+                if (rc == TPM2_RC_SUCCESS) {
+                    total += scenario.parameters.repetitions;
+                }
+            } while (get_next_rsa_enc_scheme(&scenario.rsa_encrypt.scheme));
+            scenario.rsa_encrypt.scheme.scheme = TPM2_ALG_NULL;
+        }
+    }
+
+    if (command_in_options("rsa_decrypt")) {
+        scenario.command_code = TPM2_CC_RSA_Decrypt;
+        scenario.rsa_decrypt = (struct perf_rsa_decrypt_scenario) {
+            .keylen = 0,
+            .message = { .size = 64 },
+        };
+        memset(&scenario.rsa_decrypt.message.buffer, 0x00, scenario.rsa_decrypt.message.size);
+        while (get_next_rsa_keylen(&scenario.rsa_decrypt.keylen)) {
+            do {
+                TPM2B_PUBLIC inPublic = prepare_template_RSA(scenario.rsa_decrypt.keylen);
+                TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
+                if (rc == TPM2_RC_SUCCESS) {
+                    total += scenario.parameters.repetitions;
+                }
+            } while (get_next_rsa_enc_scheme(&scenario.rsa_decrypt.scheme));
+            scenario.rsa_decrypt.scheme.scheme = TPM2_ALG_NULL;
+        }
+    }
+
+    if (command_in_options("getrandom")) {
+        total += scenario.parameters.repetitions * 2;
+    }
+
+    if (command_in_options("encryptdecrypt")) {
+        scenario.command_code = TPM2_CC_EncryptDecrypt;
+        scenario.encryptdecrypt = (struct perf_encryptdecrypt_scenario) {
+            .sym = {
+                .algorithm = TPM2_ALG_NULL,
+                .keyBits = 0,
+                .mode = TPM2_ALG_NULL,
+            },
+        };
+
+        while (get_next_symcipher(&scenario.encryptdecrypt.sym)) {
+            while (get_next_sym_mode(&scenario.encryptdecrypt.sym.mode.sym)) {
+                TPMT_PUBLIC_PARMS key_params = {
+                    .type = TPM2_ALG_SYMCIPHER,
+                    .parameters = {
+                        .symDetail = {
+                            .sym = scenario.encryptdecrypt.sym,
+                        }
+                    }
+                };
+
+                TPM2B_PUBLIC inPublic = prepare_template(&key_params);
+                inPublic.publicArea.objectAttributes |= TPMA_OBJECT_DECRYPT;
+
+                TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
+                if (rc == TPM2_RC_SUCCESS) {
+                    // once for encrypt, onece for decrypt
+                    total += scenario.parameters.repetitions * 2;
+                }
+            }
+            scenario.encryptdecrypt.sym.mode.sym = TPM2_ALG_NULL;
+        }
+    }
+
+    if (command_in_options("hmac")) {
+        scenario.command_code = TPM2_CC_HMAC;
+        TPMT_PUBLIC_PARMS key_params = {
+            .type = TPM2_ALG_KEYEDHASH,
+            .parameters = {
+                .keyedHashDetail = {
+                    .scheme = {
+                        .scheme = TPM2_ALG_HMAC,
+                        .details = { .hmac = { .hashAlg = TPM2_ALG_SHA256 } },
+                    }
+                }
+            }
+        };
+        TPM2B_PUBLIC inPublic = prepare_template(&key_params);
+
+        TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
+        if (rc == TPM2_RC_SUCCESS) {
+            total += scenario.parameters.repetitions;
+        }
+    }
+
+    if (command_in_options("hash")) {
+        scenario.command_code = TPM2_CC_Hash;
+        scenario.hash.hash_alg = TPM2_ALG_NULL;
+        while (get_next_hash_algorithm(&scenario.hash.hash_alg)) {
+            TPM2B_MAX_BUFFER data = { .size = 256 };
+            memset(&data.buffer, 0x00, data.size);
+
+            /* Test if alg is supported */
+            if (hash(sapi_context, &data, scenario.hash.hash_alg, NULL) != 0x02c3) {
+                total += scenario.parameters.repetitions;
+            }
+        }
+    }
 }
 
 void run_perf_scenarios(
@@ -565,6 +748,10 @@ void run_perf_scenarios(
     struct perf_scenario scenario = {
         .parameters = *parameters,
     };
+    struct progress prog;
+
+    prog.total = count_supported_perf_scenarios(sapi_context, parameters);
+    prog.current = 0;
 
     TPMI_DH_OBJECT primary_handle;
     log_info("Perf: Creating primary key...");
@@ -586,7 +773,7 @@ void run_perf_scenarios(
         memset(&scenario.sign.digest.buffer, 0x00, scenario.sign.digest.size);
         while (get_next_asym_key_params(&scenario.sign.key_params)) {
             while (get_next_sign_scheme(&scenario.sign.scheme, scenario.sign.key_params.type)) {
-                run_perf_on_primary(sapi_context, &scenario, primary_handle);
+                run_perf_on_primary(sapi_context, &scenario, primary_handle, &prog);
             }
             scenario.sign.scheme.scheme = TPM2_ALG_NULL;
         }
@@ -602,7 +789,7 @@ void run_perf_scenarios(
         memset(&scenario.verifysignature.digest.buffer, 0x00, scenario.verifysignature.digest.size);
         while (get_next_asym_key_params(&scenario.verifysignature.key_params)) {
             do {
-                run_perf_on_primary(sapi_context, &scenario, primary_handle);
+                run_perf_on_primary(sapi_context, &scenario, primary_handle, &prog);
             } while (get_next_sign_scheme(&scenario.verifysignature.scheme, scenario.verifysignature.key_params.type));
             scenario.verifysignature.scheme.scheme = TPM2_ALG_NULL;
         }
@@ -617,7 +804,7 @@ void run_perf_scenarios(
         memset(&scenario.rsa_encrypt.message.buffer, 0x00, scenario.rsa_encrypt.message.size);
         while (get_next_rsa_keylen(&scenario.rsa_encrypt.keylen)) {
             do {
-                run_perf_on_primary(sapi_context, &scenario, primary_handle);
+                run_perf_on_primary(sapi_context, &scenario, primary_handle, &prog);
             } while (get_next_rsa_enc_scheme(&scenario.rsa_encrypt.scheme));
             scenario.rsa_encrypt.scheme.scheme = TPM2_ALG_NULL;
         }
@@ -632,7 +819,7 @@ void run_perf_scenarios(
         memset(&scenario.rsa_decrypt.message.buffer, 0x00, scenario.rsa_decrypt.message.size);
         while (get_next_rsa_keylen(&scenario.rsa_decrypt.keylen)) {
             do {
-                run_perf_on_primary(sapi_context, &scenario, primary_handle);
+                run_perf_on_primary(sapi_context, &scenario, primary_handle, &prog);
             } while (get_next_rsa_enc_scheme(&scenario.rsa_decrypt.scheme));
             scenario.rsa_decrypt.scheme.scheme = TPM2_ALG_NULL;
         }
@@ -640,7 +827,7 @@ void run_perf_scenarios(
 
     if (command_in_options("getrandom")) {
         scenario.command_code = TPM2_CC_GetRandom;
-        run_perf_getrandom(sapi_context, &scenario);
+        run_perf_getrandom(sapi_context, &scenario, &prog);
     }
 
     if (command_in_options("encryptdecrypt")) {
@@ -655,9 +842,9 @@ void run_perf_scenarios(
         while (get_next_symcipher(&scenario.encryptdecrypt.sym)) {
             while (get_next_sym_mode(&scenario.encryptdecrypt.sym.mode.sym)) {
                 scenario.encryptdecrypt.decrypt = TPM2_NO;
-                run_perf_on_primary(sapi_context, &scenario, primary_handle);
+                run_perf_on_primary(sapi_context, &scenario, primary_handle, &prog);
                 scenario.encryptdecrypt.decrypt = TPM2_YES;
-                run_perf_on_primary(sapi_context, &scenario, primary_handle);
+                run_perf_on_primary(sapi_context, &scenario, primary_handle, &prog);
             }
             scenario.encryptdecrypt.sym.mode.sym = TPM2_ALG_NULL;
         }
@@ -665,14 +852,14 @@ void run_perf_scenarios(
 
     if (command_in_options("hmac")) {
         scenario.command_code = TPM2_CC_HMAC;
-        run_perf_on_primary(sapi_context, &scenario, primary_handle);
+        run_perf_on_primary(sapi_context, &scenario, primary_handle, &prog);
     }
 
     if (command_in_options("hash")) {
         scenario.command_code = TPM2_CC_Hash;
         scenario.hash.hash_alg = TPM2_ALG_NULL;
         while (get_next_hash_algorithm(&scenario.hash.hash_alg)) {
-            run_perf_hash(sapi_context, &scenario);
+            run_perf_hash(sapi_context, &scenario, &prog);
         }
     }
 
