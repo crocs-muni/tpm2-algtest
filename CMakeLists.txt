@@ -1,3 +1,4 @@
+project(tpm2-algtest)
 cmake_minimum_required(VERSION 3.10)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -g")
@@ -46,3 +47,5 @@ include_directories(${LIB_SRC} ${TOOLS_SRC} ${ALGTEST_SRC})
 add_executable(tpm2_algtest ${SOURCES})
 
 target_link_libraries(tpm2_algtest tss2-mu tss2-sys crypto dl)
+
+install(TARGETS tpm2_algtest DESTINATION /usr/bin)
