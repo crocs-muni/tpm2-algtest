@@ -39,3 +39,13 @@ ERROR: Failed to GetCapability: capability: 0x0, property: 0x1, TSS2_RC: 0x80001
 ERROR: Unable to run tpm2_getcap
 ```
 you have TPM 1.2 which is not compatible for this testing.
+
+#### tpm2-abrmd
+Only one process can access /dev/tpm0 directly at the same time. Some distributions (e.g. Fedora) use daemon `tpm2-abrmd` as a resource manager which already takes control of the device. In order to run this script you have to temporarily stop this daemon:
+```
+$ sudo systemctl stop tpm2-abrmd
+```
+When the script finishes, you can start it again:
+```
+$ sudo systemctl start tpm2-abrmd
+```
