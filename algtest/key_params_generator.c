@@ -28,7 +28,7 @@ bool get_next_sym_keylen(TPM2_KEY_BITS *keylen)
 
 bool get_next_ecc_curve(TPMI_ECC_CURVE *curve)
 {
-    while (*curve <= 0x0020) {
+    while (*curve <= 0x0080) {
         ++(*curve);
         if (curve_in_options(*curve)) {
             return true;
