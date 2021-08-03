@@ -4,6 +4,7 @@
 #include "object_util.h"
 #include "key_params_generator.h"
 #include "util.h"
+#include "status.h"
 
 #include <tss2/tss2_sys.h>
 #include <stdlib.h>
@@ -45,7 +46,8 @@ bool test_detail(
         TSS2_SYS_CONTEXT *sapi_context,
         const struct keygen_scenario *scenario,
         TPMI_DH_OBJECT primary_handle,
-        struct keygen_result *result)
+        struct keygen_result *result,
+	struct progress *prog)
 {
     TPM2B_PUBLIC inPublic = prepare_template(&scenario->key_params);
 
@@ -106,6 +108,9 @@ bool test_detail(
             extract_keys(sapi_context, primary_handle, &outPublic, &outPrivate,
                     &result->keypairs[i]);
         }
+
+	prog->current++;
+	printf("%lu%%\n", get_progress_percentage(prog));
     }
     return true;
 }
@@ -241,7 +246,8 @@ void free_result(
 void run_keygen_on_primary(
         TSS2_SYS_CONTEXT *sapi_context,
         const struct keygen_scenario *scenario,
-        TPMI_DH_OBJECT primary_handle)
+        TPMI_DH_OBJECT primary_handle,
+	struct progress *prog)
 {
     struct keygen_result result;
 
@@ -249,12 +255,42 @@ void run_keygen_on_primary(
         return;
     }
 
-    bool ok = test_detail(sapi_context, scenario, primary_handle, &result);
+    bool ok = test_detail(sapi_context, scenario, primary_handle, &result, prog);
     if (ok) {
         output_results(scenario, &result);
     }
 
     free_result(scenario, &result);
+}
+
+long unsigned count_supported_keygen_scenarios(
+        TSS2_SYS_CONTEXT *sapi_context,
+        const struct scenario_parameters *parameters)
+{
+    struct keygen_scenario scenario = {
+        .parameters = *parameters,
+        .key_params = { .type = TPM2_ALG_NULL },
+        .no_export = options.no_export,
+    };
+
+    long unsigned total = 0;
+
+    while (get_next_key_params(&scenario.key_params)) {
+	    TPM2B_PUBLIC inPublic = prepare_template(&scenario.key_params);
+
+	    if (!scenario.no_export) {
+		    inPublic.publicArea.authPolicy = get_dup_policy(sapi_context);
+	    }
+
+	    TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
+	    if (rc != TPM2_RC_SUCCESS) {
+		    continue;
+	    }
+
+	    total += scenario.parameters.repetitions;
+    }
+
+    return total;
 }
 
 void run_keygen_scenarios(
@@ -267,6 +303,11 @@ void run_keygen_scenarios(
         .no_export = options.no_export,
     };
 
+    struct progress prog;
+
+    prog.total = count_supported_keygen_scenarios(sapi_context, parameters);
+    prog.current = 0;
+
     TPMI_DH_OBJECT primary_handle;
     log_info("Keygen: Creating primary key...");
     TPM2_RC rc = create_primary_ECC_NIST_P256(sapi_context, &primary_handle);
@@ -278,7 +319,7 @@ void run_keygen_scenarios(
     }
 
     while (get_next_key_params(&scenario.key_params)) {
-        run_keygen_on_primary(sapi_context, &scenario, primary_handle);
+        run_keygen_on_primary(sapi_context, &scenario, primary_handle, &prog);
     }
 
     Tss2_Sys_FlushContext(sapi_context, primary_handle);

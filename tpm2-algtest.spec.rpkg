@@ -1,0 +1,40 @@
+# vim: syntax=spec
+
+Name:       {{{ git_dir_name }}}
+Version:    {{{ git_dir_version }}}
+Release:    1%{?dist}
+Summary:    TPM2 performance testing tool
+License:    BSD
+URL:        https://github.com/danzatt/tpm2-algtest
+VCS:        {{{ git_dir_vcs }}}
+Source:     {{{ git_dir_pack }}}
+Requires:   tpm2-tss tpm2-tools
+BuildRequires: cmake make gcc tpm2-tss-devel openssl-devel
+
+%description
+It has been found out that implementation specifics of cryptographic smart
+cards can lead to serious vulnerabilities [1]. Since TPM chips are often
+manufactured by the same vendors, we have decided to create a tool that would
+help with collection of data from various TPMs that could be used for further
+analysis and discovery of similar bugs.
+
+%global debug_package %{nil}
+
+%prep
+{{{ git_dir_setup_macro }}}
+
+%build
+mkdir build
+cd build
+cmake ..
+make
+
+%install
+cd build
+make DESTDIR=%{buildroot} install
+
+%files
+/usr/bin/tpm2_algtest
+
+%changelog
+{{{ git_dir_changelog }}}
