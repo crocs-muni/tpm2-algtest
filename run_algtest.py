@@ -156,6 +156,23 @@ def perf(args):
     with open(os.path.join(detail_dir, 'perf_log.txt'), 'w') as logfile:
         run_algtest(run_command, logfile)
 
+
+def nonce(args):
+    detail_dir = os.path.join(args.outdir, 'detail')
+    if args.docker:
+        run_command = [ 'docker', 'run', '-it', '--init', '--device=' + device,
+                '--volume=' + os.path.join(os.getcwd(), detail_dir) + ':/tpm2-algtest/build/out:z',
+                'simonstruk/tpm2-algtest:' + image_tag ]
+    else:
+        run_command = [ 'sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir ]
+    run_command += ['-T', 'device', '-s', 'nonce' ]
+    add_args(run_command, args)
+
+    print('Running ECC nonce test...')
+    with open(os.path.join(detail_dir, 'nonce_log.txt'), 'w') as logfile:
+        run_algtest(run_command, logfile)
+
+
 def get_tpm_id(detail_dir):
     def get_val(line):
         return line[line.find('0x') + 2:-1]
@@ -350,6 +367,10 @@ def main():
         os.makedirs(detail_dir, exist_ok=True)
         perf(args)
         zip(args.outdir)
+    elif args.test == 'nonce':
+        os.makedirs(detail_dir, exist_ok=True)
+        nonce(args)
+        zip(args.outdir)
     elif args.test == 'fulltest':
         os.makedirs(detail_dir, exist_ok=True)
         with open(os.path.join(detail_dir, 'image_tag.txt'), 'w') as f:
@@ -357,6 +378,7 @@ def main():
         quicktest(args, detail_dir)
         keygen(args)
         perf(args)
+        nonce(args)
         create_result_files(args.outdir)
         zip(args.outdir)
         print('The tests are finished. Thank you! Please send the generated file (' + args.outdir + '.zip) to xstruk@fi.muni.cz')
@@ -367,7 +389,7 @@ def main():
         create_result_files(args.outdir)
         zip(args.outdir)
     else:
-        print('invalid test type, needs to be one of: fulltest, quicktest, keygen, perf, format')
+        print('invalid test type, needs to be one of: fulltest, quicktest, keygen, perf, nonce, format')
 
 if __name__ == '__main__':
     main()
