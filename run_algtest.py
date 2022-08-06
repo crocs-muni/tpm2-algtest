@@ -173,6 +173,22 @@ def nonce(args):
         run_algtest(run_command, logfile)
 
 
+def rng(args):
+    detail_dir = os.path.join(args.outdir, 'detail')
+    if args.docker:
+        run_command = [ 'docker', 'run', '-it', '--init', '--device=' + device,
+                '--volume=' + os.path.join(os.getcwd(), detail_dir) + ':/tpm2-algtest/build/out:z',
+                'simonstruk/tpm2-algtest:' + image_tag ]
+    else:
+        run_command = [ 'sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir ]
+    run_command += ['-T', 'device', '-s', 'rng' ]
+    add_args(run_command, args)
+
+    print('Running Rng test...')
+    with open(os.path.join(detail_dir, 'rng_log.txt'), 'w') as logfile:
+        run_algtest(run_command, logfile)
+
+
 def get_tpm_id(detail_dir):
     def get_val(line):
         return line[line.find('0x') + 2:-1]
@@ -371,14 +387,19 @@ def main():
         os.makedirs(detail_dir, exist_ok=True)
         nonce(args)
         zip(args.outdir)
+    elif args.test == 'rng':
+        os.makedirs(detail_dir, exist_ok=True)
+        rng(args)
+        zip(args.outdir)
     elif args.test == 'fulltest':
         os.makedirs(detail_dir, exist_ok=True)
         with open(os.path.join(detail_dir, 'image_tag.txt'), 'w') as f:
             f.write(image_tag)
         quicktest(args, detail_dir)
         keygen(args)
-        perf(args)
         nonce(args)
+        rng(args)
+        perf(args)
         create_result_files(args.outdir)
         zip(args.outdir)
         print('The tests are finished. Thank you! Please send the generated file (' + args.outdir + '.zip) to xstruk@fi.muni.cz')
@@ -389,7 +410,7 @@ def main():
         create_result_files(args.outdir)
         zip(args.outdir)
     else:
-        print('invalid test type, needs to be one of: fulltest, quicktest, keygen, perf, nonce, format')
+        print('invalid test type, needs to be one of: fulltest, quicktest, keygen, nonce, rng, perf, format')
 
 if __name__ == '__main__':
     main()
