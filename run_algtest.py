@@ -156,6 +156,59 @@ def perf(args):
     with open(os.path.join(detail_dir, 'perf_log.txt'), 'w') as logfile:
         run_algtest(run_command, logfile)
 
+def compute_nonce(filename):
+    CURVE_ORDER = {
+        "P256": 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551,
+        "P384": 0xffffffffffffffffffffffffffffffffffffffffffffffffc7634d81f4372ddf581a0db248b0a77aecec196accc52973,
+        "BN256": 0xfffffffffffcf0cd46e5f25eee71a49e0cdc65fb1299921af62d536cd10b500d
+    }
+
+    def extract_ecdsa_nonce(n, r, s, x, e):
+        # https://en.wikipedia.org/wiki/Elliptic_Curve_Digital_Signature_Algorithm
+        return (pow(s, -1, n) * (e + (r * x) % n) % n) % n
+
+    def extract_ecschnorr_nonce(n, r, s, x, e):
+        # https://trustedcomputinggroup.org/wp-content/uploads/TPM2.0-Library-Spec-v1.16-Errata_v1.5_09212016.pdf
+        return (s - (r * x) % n) % n
+
+    def extract_sm2_nonce(n, r, s, x, e):
+        # https://crypto.stackexchange.com/questions/9918/reasons-for-chinese-sm2-digital-signature-algorithm
+        return (s + (s * x) % n + (r * x) % n) % n
+
+    def compute_row(row):
+        try:
+            digest = int(row['digest'], 16)
+            curve = { 0x3: "P256", 0x4: "P384", 0x10: "BN256" }[int(row['curve'], 16)]
+            algorithm = { 0x18: "ECDSA", 0x1b: "SM2", 0x1c: "ECSCHNORR" }[int(row['algorithm'], 16)]
+            signature_r = int(row['signature_r'], 16)
+            signature_s = int(row['signature_s'], 16)
+            private_key = int(row['private_key'], 16)
+
+            row['nonce'] = hex({
+                "ECDSA": extract_ecdsa_nonce,
+                "ECSCHNORR": extract_ecschnorr_nonce,
+                "SM2": extract_sm2_nonce
+            }[algorithm](CURVE_ORDER[curve], signature_r, signature_s, private_key, digest))[2:]
+
+        except Exception:
+            print(f"Cannot compute row {row['id']}")
+            return
+
+    rows = []
+    with open(filename) as infile:
+        reader = csv.DictReader(infile, delimiter=',')
+        for row in reader:
+            rows.append(row)
+
+    for row in rows:
+        compute_row(row)
+
+    with open(filename, 'w') as outfile:
+        writer = csv.DictWriter(
+                outfile, delimiter=',', fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)
 
 def nonce(args):
     detail_dir = os.path.join(args.outdir, 'detail')
@@ -171,6 +224,11 @@ def nonce(args):
     print('Running ECC nonce test...')
     with open(os.path.join(detail_dir, 'nonce_log.txt'), 'w') as logfile:
         run_algtest(run_command, logfile)
+
+    print('Computing ECC nonces...')
+    for filename in glob.glob(os.path.join(detail_dir, 'Nonce:ECC_*.csv')):
+        print(filename)
+        compute_nonce(filename)
 
 
 def rng(args):

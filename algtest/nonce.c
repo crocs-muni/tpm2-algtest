@@ -86,10 +86,10 @@ void output_results(
     }
     if (!fn_valid) { return; }
 
-    FILE *out = open_csv(filename, "algorithm,curve,digest,signature_r,signature_s,private_key,public_key_x,public_key_y,duration,return_code");
+    FILE *out = open_csv(filename, "id,algorithm,curve,digest,signature_r,signature_s,private_key,public_key_x,public_key_y,duration,return_code");
     for (int i = 0; i < result->size; ++i) {
         struct nonce_data_point *dp = &result->data_points[i];
-        fprintf(out, "%04x,%04x,", dp->algorithm_id, dp->curve_id);
+        fprintf(out, "%d,%04x,%04x,", i, dp->algorithm_id, dp->curve_id);
         for(uint16_t j = 0; j < dp->digest_size; ++j) {
             fprintf(out, "%02x", dp->digest[j]);
         }
