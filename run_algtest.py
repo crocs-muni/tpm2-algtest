@@ -137,7 +137,7 @@ def keygen(args):
         run_algtest(run_command, logfile)
 
     print('Computing RSA private keys...')
-    for filename in glob.glob(os.path.join(detail_dir, 'Keygen_RSA_*_keys.csv')):
+    for filename in glob.glob(os.path.join(detail_dir, 'Keygen:RSA_*.csv')):
         print(filename)
         compute_rsa_privates(filename)
 
