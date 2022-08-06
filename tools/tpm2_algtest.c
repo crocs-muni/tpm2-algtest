@@ -5,6 +5,7 @@
 #include "keygen.h"
 #include "perf.h"
 #include "nonce.h"
+#include "rng.h"
 
 #include "tpm2_tool.h"
 #include "tpm2_session.h"
@@ -111,6 +112,11 @@ int tpm2_tool_onrun(TSS2_SYS_CONTEXT *sapi_context, tpm2_option_flags flags)
     if (scenario_in_options("nonce")) {
         set_parameters_from_options(&parameters);
         run_nonce_scenarios(sapi_context, &parameters);
+    }
+
+    if (scenario_in_options("rng")) {
+        set_parameters_from_options(&parameters);
+        run_rng_scenarios(sapi_context, &parameters);
     }
 
     if (scenario_in_options("perf")) {
