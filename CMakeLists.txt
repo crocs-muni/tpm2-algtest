@@ -39,6 +39,7 @@ set(SOURCES
     ${ALGTEST_SRC}/keygen.c
     ${ALGTEST_SRC}/perf.c
     ${ALGTEST_SRC}/nonce.c
+    ${ALGTEST_SRC}/rng.c
     ${ALGTEST_SRC}/object_util.c
     ${ALGTEST_SRC}/perf_util.c
 )
