@@ -4,20 +4,14 @@
 
 #include <tss2/tss2_sys.h>
 
-struct nonce_sign_scenario {
-    TPMT_PUBLIC_PARMS key_params;
-    TPMT_SIG_SCHEME scheme;
-    TPM2B_DIGEST digest;
-};
-
 
 struct nonce_scenario {
     struct scenario_parameters parameters;
     TPM2_CC command_code;
     bool no_export;
-    union {
-        struct nonce_sign_scenario sign;
-    };
+    TPMT_PUBLIC_PARMS key_params;
+    TPMT_SIG_SCHEME scheme;
+    TPM2B_DIGEST digest;
 };
 
 

@@ -45,10 +45,7 @@ bool alloc_result(
 {
     result->data_points = calloc(scenario->parameters.repetitions,
             sizeof(struct nonce_data_point));
-    if (result->data_points == NULL) {
-        return false;
-    }
-    return true;
+    return result->data_points != NULL;
 }
 
 static
@@ -58,7 +55,7 @@ void free_result(struct nonce_result *result)
 }
 
 bool get_csv_filename_nonce(
-        const struct nonce_sign_scenario *scenario,
+        const struct nonce_scenario *scenario,
         char filename[256])
 {
     switch (scenario->key_params.type) {
@@ -82,7 +79,7 @@ void output_results(
     bool fn_valid = true;
     switch (scenario->command_code) {
     case TPM2_CC_Sign:
-        fn_valid = get_csv_filename_nonce(&scenario->sign, filename); break;
+        fn_valid = get_csv_filename_nonce(scenario, filename); break;
     default:
         log_error("Nonce: (output_results) Command not supported.");
         return;
@@ -128,7 +125,7 @@ bool run_nonce_sign(
         struct nonce_result *result,
         struct progress *prog)
 {
-    TPM2B_PUBLIC inPublic = prepare_template(&scenario->sign.key_params);
+    TPM2B_PUBLIC inPublic = prepare_template(&scenario->key_params);
     if(!scenario->no_export) {
         inPublic.publicArea.authPolicy = get_dup_policy(sapi_context);
     }
@@ -167,7 +164,7 @@ bool run_nonce_sign(
 
         TPMT_SIGNATURE signature;
         result->data_points[i].rc = sign(sapi_context, object_handle,
-                &scenario->sign.scheme, &scenario->sign.digest, &signature,
+                &scenario->scheme, &scenario->digest, &signature,
                 &result->data_points[i].duration_s);
 
         if(result->data_points[i].rc == TPM2_RC_SUCCESS) {
@@ -189,9 +186,9 @@ bool run_nonce_sign(
                     log_warning("Nonce: Unknown signature algorithm %04x", signature.sigAlg);
             }
             result->data_points[i].algorithm_id = signature.sigAlg;
-            result->data_points[i].curve_id = scenario->sign.key_params.parameters.eccDetail.curveID;
-            result->data_points[i].digest_size = scenario->sign.digest.size;
-            memcpy(&result->data_points[i].digest, scenario->sign.digest.buffer, scenario->sign.digest.size);
+            result->data_points[i].curve_id = scenario->key_params.parameters.eccDetail.curveID;
+            result->data_points[i].digest_size = scenario->digest.size;
+            memcpy(&result->data_points[i].digest, scenario->digest.buffer, scenario->digest.size);
 
             if(r) {
                 result->data_points[i].signature_r_size = r->size;
@@ -219,8 +216,8 @@ bool run_nonce_sign(
         }
         ++result->size;
         log_info("Nonce %d: ECC | scheme %04x | curve %04x | duration %f | rc %04x",
-                i, scenario->sign.scheme.scheme,
-                scenario->sign.key_params.parameters.eccDetail.curveID,
+                i, scenario->scheme.scheme,
+                scenario->key_params.parameters.eccDetail.curveID,
                 result->data_points[i].duration_s, result->data_points[i].rc);
 
 	    printf("%lu%%\n", inc_and_get_progress_percentage(prog));
@@ -242,7 +239,7 @@ void run_nonce_on_primary(
         return;
     }
 
-    if(run_nonce_sign(sapi_context, scenario, primary_handle, &result, prog) {
+    if(run_nonce_sign(sapi_context, scenario, primary_handle, &result, prog)) {
         output_results(scenario, &result);
     }
     free_result(&result);
@@ -259,22 +256,20 @@ unsigned long count_supported_nonce_scenarios(
 
     if (command_in_options("sign")) {
         scenario.command_code = TPM2_CC_Sign;
-        scenario.sign = (struct nonce_sign_scenario) {
-            .key_params = { .type = TPM2_ALG_NULL },
-            .scheme = { .scheme = TPM2_ALG_NULL },
-            .digest = { .size = 32 }, // Using SHA256
-        };
-        memset(&scenario.sign.digest.buffer, 0x00, scenario.sign.digest.size);
-        while (get_next_asym_key_params(&scenario.sign.key_params)) {
-            while (get_next_sign_scheme(&scenario.sign.scheme, scenario.sign.key_params.type)) {
-                TPM2B_PUBLIC inPublic = prepare_template(&scenario.sign.key_params);
+        scenario.key_params = (TPMT_PUBLIC_PARMS) { .type = TPM2_ALG_NULL };
+        scenario.scheme = (TPMT_SIG_SCHEME) { .scheme = TPM2_ALG_NULL };
+        scenario.digest = (struct TPM2B_DIGEST) { .size = 32 }; // Using SHA256
+        memset(&scenario.digest.buffer, 0x00, scenario.digest.size);
+        while (get_next_asym_key_params(&scenario.key_params)) {
+            while (get_next_sign_scheme(&scenario.scheme, scenario.key_params.type)) {
+                TPM2B_PUBLIC inPublic = prepare_template(&scenario.key_params);
 
                 TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
                 if (rc == TPM2_RC_SUCCESS) {
                     total += scenario.parameters.repetitions;
                 }
             }
-            scenario.sign.scheme.scheme = TPM2_ALG_NULL;
+            scenario.scheme.scheme = TPM2_ALG_NULL;
         }
     }
 
@@ -305,16 +300,14 @@ void run_nonce_scenarios(
 
     if (command_in_options("sign")) {
         scenario.command_code = TPM2_CC_Sign;
-        scenario.sign = (struct nonce_sign_scenario) {
-            .key_params = { .type = TPM2_ALG_NULL },
-            .scheme = { .scheme = TPM2_ALG_NULL },
-            .digest = { .size = 32 }, // Using SHA256
-        };
-        memset(&scenario.sign.digest.buffer, 0x00, scenario.sign.digest.size);
+        scenario.key_params = (TPMT_PUBLIC_PARMS) { .type = TPM2_ALG_NULL };
+        scenario.scheme = (TPMT_SIG_SCHEME) { .scheme = TPM2_ALG_NULL };
+        scenario.digest = (struct TPM2B_DIGEST) { .size = 32 }; // Using SHA256
+        memset(&scenario.digest.buffer, 0x00, scenario.digest.size);
 
-        scenario.sign.key_params.type = TPM2_ALG_ECC;
+        scenario.key_params.type = TPM2_ALG_ECC;
         if (type_in_options("ecc")) {
-            scenario.sign.key_params.parameters.eccDetail = (TPMS_ECC_PARMS) {
+            scenario.key_params.parameters.eccDetail = (TPMS_ECC_PARMS) {
                     .symmetric = TPM2_ALG_NULL,
                     .scheme = TPM2_ALG_NULL,
                     .curveID = 0x0000,
@@ -322,11 +315,11 @@ void run_nonce_scenarios(
             };
         }
 
-        while (get_next_ecc_curve(&scenario.sign.key_params.parameters.eccDetail.curveID)) {
-            while (get_next_sign_scheme(&scenario.sign.scheme, scenario.sign.key_params.type)) {
+        while (get_next_ecc_curve(&scenario.key_params.parameters.eccDetail.curveID)) {
+            while (get_next_sign_scheme(&scenario.scheme, scenario.key_params.type)) {
                 run_nonce_on_primary(sapi_context, &scenario, primary_handle, &prog);
             }
-            scenario.sign.scheme.scheme = TPM2_ALG_NULL;
+            scenario.scheme.scheme = TPM2_ALG_NULL;
         }
     }
 
