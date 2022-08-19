@@ -381,7 +381,8 @@ bool run_perf_encryptdecrypt(
         .size = scenario->encryptdecrypt.sym.mode.sym == TPM2_ALG_ECB
             ? 0 : scenario->encryptdecrypt.sym.keyBits.sym / 8
     };
-    memset(&inIv.buffer, 0x00, inIv.size);
+    inIv.size = inIv.size > 16 ? 16 : inIv.size;
+    memset(&inIv.buffer, 0x00, sizeof(inIv.buffer));
     TPM2B_MAX_BUFFER inData = { .size = 256 };
     memset(&inData.buffer, 0x00, inData.size);
 
