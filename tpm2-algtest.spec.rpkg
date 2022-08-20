@@ -1,7 +1,7 @@
 # vim: syntax=spec
 
 Name:       {{{ git_dir_name }}}
-Version:    {{{ git_dir_version }}}
+Version:    0.4
 Release:    1%{?dist}
 Summary:    TPM2 performance testing tool
 License:    BSD
