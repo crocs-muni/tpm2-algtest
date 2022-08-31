@@ -11,19 +11,19 @@
 #include <time.h>
 
 static
-void nonce_extract_keys(
+void export_keypair(
         TSS2_SYS_CONTEXT *sapi_context,
         TPMI_DH_OBJECT primary_handle,
         const TPM2B_PUBLIC *outPublic,
         const TPM2B_PRIVATE *outPrivate,
-        struct nonce_keypair *keypair)
+        struct exported_keypair *keypair)
 {
     keypair->public_key = outPublic->publicArea.unique;
     TPM2_HANDLE object_handle;
     TPM2_RC rc = load(sapi_context, primary_handle, outPrivate, outPublic,
                       &object_handle);
     if (rc != TPM2_RC_SUCCESS) {
-        log_warning("Cryptoops nonce: Cannot load object into TPM! (%04x)", rc);
+        log_warning("Cryptoops ecc: Cannot load object into TPM! (%04x)", rc);
         return;
     }
 
@@ -31,7 +31,7 @@ void nonce_extract_keys(
     rc = extract_sensitive(sapi_context, object_handle, &sensitive);
     Tss2_Sys_FlushContext(sapi_context, object_handle);
     if (rc != TPM2_RC_SUCCESS) {
-        log_warning("Cryptoops nonce: Cannot extract private key! (%04x)", rc);
+        log_warning("Cryptoops ecc: Cannot extract private key! (%04x)", rc);
         return;
     } else {
         keypair->private_key = sensitive;
@@ -54,79 +54,89 @@ void free_result(struct cryptoops_result *result)
     free(result->data_points);
 }
 
-bool get_csv_filename_nonce(
-        const struct cryptoops_scenario *scenario,
-        char filename[256])
-{
-    switch (scenario->nonce.key_params.type) {
-    case TPM2_ALG_ECC:
-        snprintf(filename, 256, "Nonce:ECC_0x%04x_0x%04x.csv",
-                scenario->nonce.key_params.parameters.eccDetail.curveID, scenario->nonce.scheme.scheme);
-        break;
-    default:
-        log_error("Cryptoops nonce: (output_results) Algorithm type not supported.");
-        return false;
-    }
-    return true;
-}
-
 static
-void output_nonce_results(
+void output_ecc_results(
         const struct cryptoops_scenario *scenario,
         const struct cryptoops_result *result)
 {
     char filename[256];
-    bool fn_valid = true;
-    switch (scenario->command_code) {
-    case TPM2_CC_Sign:
-        fn_valid = get_csv_filename_nonce(scenario, filename); break;
-    default:
-        log_error("Cryptoops nonce: (output_results) Command not supported.");
-        return;
-    }
-    if (!fn_valid) { return; }
+    snprintf(filename, 256, "Cryptoops_Sign:ECC_0x%04x_0x%04x.csv",
+             scenario->sign.key_params.parameters.eccDetail.curveID, scenario->sign.scheme.scheme);
 
     FILE *out = open_csv(filename, "id,algorithm,curve,digest,signature_r,signature_s,private_key,public_key_x,public_key_y,duration,return_code");
     for (int i = 0; i < result->size; ++i) {
         struct cryptoops_data_point *dp = &result->data_points[i];
-        fprintf(out, "%d,%04x,%04x,", i, dp->nonce.algorithm_id, dp->nonce.curve_id);
-        for(uint16_t j = 0; j < dp->nonce.digest_size; ++j) {
-            fprintf(out, "%02x", dp->nonce.digest[j]);
+        fprintf(out, "%d,%04x,%04x,", i, dp->ecc.algorithm_id, dp->ecc.curve_id);
+        for(uint16_t j = 0; j < dp->ecc.digest_size; ++j) {
+            fprintf(out, "%02x", dp->ecc.digest[j]);
         }
         fprintf(out, ",");
-        for(uint16_t j = 0; j < dp->nonce.signature_r_size; ++j) {
-            fprintf(out, "%02x", dp->nonce.signature_r[j]);
+        for(uint16_t j = 0; j < dp->ecc.signature_r_size; ++j) {
+            fprintf(out, "%02x", dp->ecc.signature_r[j]);
         }
         fprintf(out, ",");
-        for(uint16_t j = 0; j < dp->nonce.signature_s_size; ++j) {
-            fprintf(out, "%02x", dp->nonce.signature_s[j]);
+        for(uint16_t j = 0; j < dp->ecc.signature_s_size; ++j) {
+            fprintf(out, "%02x", dp->ecc.signature_s[j]);
         }
         fprintf(out, ",");
-        for(uint16_t j = 0; j < dp->nonce.private_key_size; ++j) {
-            fprintf(out, "%02x", dp->nonce.private_key[j]);
+        for(uint16_t j = 0; j < dp->ecc.private_key_size; ++j) {
+            fprintf(out, "%02x", dp->ecc.private_key[j]);
         }
         fprintf(out, ",");
-        for(uint16_t j = 0; j < dp->nonce.public_key_x_size; ++j) {
-            fprintf(out, "%02x", dp->nonce.public_key_x[j]);
+        for(uint16_t j = 0; j < dp->ecc.public_key_x_size; ++j) {
+            fprintf(out, "%02x", dp->ecc.public_key_x[j]);
         }
         fprintf(out, ",");
-        for(uint16_t j = 0; j < dp->nonce.public_key_y_size; ++j) {
-            fprintf(out, "%02x", dp->nonce.public_key_y[j]);
+        for(uint16_t j = 0; j < dp->ecc.public_key_y_size; ++j) {
+            fprintf(out, "%02x", dp->ecc.public_key_y[j]);
         }
         fprintf(out, ",%f,%04x\n", dp->duration_s, dp->rc);
     }
     fclose(out);
 }
 
-bool run_nonce_sign(
+static
+void output_rsa_results(
+        const struct cryptoops_scenario *scenario,
+        const struct cryptoops_result *result)
+{
+    char filename[256];
+    snprintf(filename, 256, "Cryptoops_Sign:RSA_%d_0x%04x.csv",
+             scenario->sign.key_params.parameters.rsaDetail.keyBits, scenario->sign.scheme.scheme);
+
+    FILE *out = open_csv(filename, "id,algorithm,hash,digest,signature,e,p,n,duration,return_code");
+    for (int i = 0; i < result->size; ++i) {
+        struct cryptoops_data_point *dp = &result->data_points[i];
+        fprintf(out, "%d,%04x,%04x,", i, dp->rsa.algorithm_id, dp->rsa.hash_id);
+        for(uint16_t j = 0; j < dp->rsa.digest_size; ++j) {
+            fprintf(out, "%02x", dp->rsa.digest[j]);
+        }
+        fprintf(out, ",");
+        for(uint16_t j = 0; j < dp->rsa.signature_size; ++j) {
+            fprintf(out, "%02x", dp->rsa.signature[j]);
+        }
+        fprintf(out, ",010001,");
+        for(uint16_t j = 0; j < dp->rsa.private_key_size; ++j) {
+            fprintf(out, "%02x", dp->rsa.private_key[j]);
+        }
+        fprintf(out, ",");
+        for(uint16_t j = 0; j < dp->rsa.public_key_size; ++j) {
+            fprintf(out, "%02x", dp->rsa.public_key[j]);
+        }
+        fprintf(out, ",%f,%04x\n", dp->duration_s, dp->rc);
+    }
+    fclose(out);
+}
+
+bool run_ecc_sign(
         TSS2_SYS_CONTEXT *sapi_context,
         const struct cryptoops_scenario *scenario,
         TPMI_DH_OBJECT primary_handle,
         struct cryptoops_result *result,
         struct progress *prog)
 {
-    TPM2B_PUBLIC inPublic = prepare_template(&scenario->nonce.key_params);
-    if(!scenario->nonce.no_export) {
+    TPM2B_PUBLIC inPublic = prepare_template(&scenario->sign.key_params);
+    if(!scenario->sign.no_export) {
         inPublic.publicArea.authPolicy = get_dup_policy(sapi_context);
     }
 
@@ -139,16 +149,16 @@ bool run_nonce_sign(
     TPM2B_PRIVATE outPrivate = { .size = 0 };
 
     TPM2_HANDLE object_handle;
-    log_info("Cryptoops nonce: Generating signing key...");
+    log_info("Cryptoops ecc: Generating signing key...");
     rc = create(sapi_context, &inPublic, primary_handle, &outPublic, &outPrivate, NULL);
     if (rc != TPM2_RC_SUCCESS) {
-        log_error("Cryptoops nonce: Error when creating signing key %04x", rc);
+        log_error("Cryptoops ecc: Error when creating signing key %04x", rc);
         return false;
     }
 
     rc = load(sapi_context, primary_handle, &outPrivate, &outPublic, &object_handle);
     if (rc != TPM2_RC_SUCCESS) {
-        log_error("Cryptoops nonce: Error when loading signing key %04x", rc);
+        log_error("Cryptoops ecc: Error when loading signing key %04x", rc);
         return false;
     }
 
@@ -164,7 +174,7 @@ bool run_nonce_sign(
 
         TPMT_SIGNATURE signature;
         result->data_points[i].rc = sign(sapi_context, object_handle,
-                &scenario->nonce.scheme, &scenario->nonce.digest, &signature,
+                &scenario->sign.scheme, &scenario->sign.digest, &signature,
                 &result->data_points[i].duration_s);
 
         if(result->data_points[i].rc == TPM2_RC_SUCCESS) {
@@ -183,41 +193,40 @@ bool run_nonce_sign(
                     s = &signature.signature.ecschnorr.signatureS;
                     break;
                 default:
-                    log_warning("Cryptoops nonce: Unknown signature algorithm %04x", signature.sigAlg);
+                    log_warning("Cryptoops ecc: Unknown signature algorithm %04x", signature.sigAlg);
             }
-            result->data_points[i].nonce.algorithm_id = signature.sigAlg;
-            result->data_points[i].nonce.curve_id = scenario->nonce.key_params.parameters.eccDetail.curveID;
-            result->data_points[i].nonce.digest_size = scenario->nonce.digest.size;
-            memcpy(&result->data_points[i].nonce.digest, scenario->nonce.digest.buffer, scenario->nonce.digest.size);
+            result->data_points[i].ecc.algorithm_id = signature.sigAlg;
+            result->data_points[i].ecc.curve_id = scenario->sign.key_params.parameters.eccDetail.curveID;
+            result->data_points[i].ecc.digest_size = scenario->sign.digest.size;
+            memcpy(&result->data_points[i].ecc.digest, scenario->sign.digest.buffer, scenario->sign.digest.size);
 
             if(r) {
-                result->data_points[i].nonce.signature_r_size = r->size;
-                memcpy(&result->data_points[i].nonce.signature_r, r->buffer, r->size);
+                result->data_points[i].ecc.signature_r_size = r->size;
+                memcpy(&result->data_points[i].ecc.signature_r, r->buffer, r->size);
             }
             if(s) {
-                result->data_points[i].nonce.signature_s_size = s->size;
-                memcpy(&result->data_points[i].nonce.signature_s, s->buffer, s->size);
+                result->data_points[i].ecc.signature_s_size = s->size;
+                memcpy(&result->data_points[i].ecc.signature_s, s->buffer, s->size);
             }
 
-            if (!scenario->nonce.no_export) {
-                struct nonce_keypair keypair;
-                nonce_extract_keys(sapi_context, primary_handle, &outPublic, &outPrivate,
-                                   &keypair);
+            if (!scenario->sign.no_export) {
+                struct exported_keypair keypair;
+                export_keypair(sapi_context, primary_handle, &outPublic, &outPrivate, &keypair);
 
-                result->data_points[i].nonce.private_key_size = keypair.private_key.ecc.size;
-                memcpy(&result->data_points[i].nonce.private_key, keypair.private_key.ecc.buffer, keypair.private_key.ecc.size);
+                result->data_points[i].ecc.private_key_size = keypair.private_key.ecc.size;
+                memcpy(&result->data_points[i].ecc.private_key, keypair.private_key.ecc.buffer, keypair.private_key.ecc.size);
 
-                result->data_points[i].nonce.public_key_x_size = keypair.public_key.ecc.x.size;
-                memcpy(&result->data_points[i].nonce.public_key_x, keypair.public_key.ecc.x.buffer, keypair.public_key.ecc.x.size);
+                result->data_points[i].ecc.public_key_x_size = keypair.public_key.ecc.x.size;
+                memcpy(&result->data_points[i].ecc.public_key_x, keypair.public_key.ecc.x.buffer, keypair.public_key.ecc.x.size);
 
-                result->data_points[i].nonce.public_key_y_size = keypair.public_key.ecc.y.size;
-                memcpy(&result->data_points[i].nonce.public_key_y, keypair.public_key.ecc.y.buffer, keypair.public_key.ecc.y.size);
+                result->data_points[i].ecc.public_key_y_size = keypair.public_key.ecc.y.size;
+                memcpy(&result->data_points[i].ecc.public_key_y, keypair.public_key.ecc.y.buffer, keypair.public_key.ecc.y.size);
             }
         }
         ++result->size;
-        log_info("Cryptoops nonce %d: ECC | scheme %04x | curve %04x | duration %f | rc %04x",
-                i, scenario->nonce.scheme.scheme,
-                scenario->nonce.key_params.parameters.eccDetail.curveID,
+        log_info("Cryptoops ecc %d: | scheme %04x | curve %04x | duration %f | rc %04x",
+                i, scenario->sign.scheme.scheme,
+                scenario->sign.key_params.parameters.eccDetail.curveID,
                 result->data_points[i].duration_s, result->data_points[i].rc);
 
 	    printf("%lu%%\n", inc_and_get_progress_percentage(prog));
@@ -227,7 +236,7 @@ bool run_nonce_sign(
     return true;
 }
 
-void run_nonce_on_primary(
+void run_ecc_sign_on_primary(
         TSS2_SYS_CONTEXT *sapi_context,
         const struct cryptoops_scenario *scenario,
         TPMI_DH_OBJECT primary_handle,
@@ -235,17 +244,134 @@ void run_nonce_on_primary(
 {
     struct cryptoops_result result;
     if (!alloc_result(scenario, &result)) {
-        log_error("Cryptoops nonce: cannot allocate memory for result.");
+        log_error("Cryptoops ecc: cannot allocate memory for result.");
         return;
     }
 
-    if(run_nonce_sign(sapi_context, scenario, primary_handle, &result, prog)) {
-        output_nonce_results(scenario, &result);
+    if(run_ecc_sign(sapi_context, scenario, primary_handle, &result, prog)) {
+        output_ecc_results(scenario, &result);
     }
     free_result(&result);
 }
 
-unsigned long count_supported_nonce_scenarios(
+bool run_rsa_sign(
+        TSS2_SYS_CONTEXT *sapi_context,
+        const struct cryptoops_scenario *scenario,
+        TPMI_DH_OBJECT primary_handle,
+        struct cryptoops_result *result,
+        struct progress *prog)
+{
+    TPM2B_PUBLIC inPublic = prepare_template(&scenario->sign.key_params);
+    if(!scenario->sign.no_export) {
+        inPublic.publicArea.authPolicy = get_dup_policy(sapi_context);
+    }
+
+    TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
+    if (rc != TPM2_RC_SUCCESS) {
+        return false;
+    }
+
+    TPM2B_PUBLIC outPublic = { .size = 0 };
+    TPM2B_PRIVATE outPrivate = { .size = 0 };
+
+    TPM2_HANDLE object_handle;
+    log_info("Cryptoops rsa: Generating signing key...");
+    rc = create(sapi_context, &inPublic, primary_handle, &outPublic, &outPrivate, NULL);
+    if (rc != TPM2_RC_SUCCESS) {
+        log_error("Cryptoops rsa: Error when creating signing key %04x", rc);
+        return false;
+    }
+
+    rc = load(sapi_context, primary_handle, &outPrivate, &outPublic, &object_handle);
+    if (rc != TPM2_RC_SUCCESS) {
+        log_error("Cryptoops rsa: Error when loading signing key %04x", rc);
+        return false;
+    }
+
+    result->size = 0;
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    for (unsigned i = 0; i < scenario->parameters.repetitions; ++i) {
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        if (get_duration_s(&start, &end) > scenario->parameters.max_duration_s) {
+            break;
+        }
+
+        TPMT_SIGNATURE signature;
+        result->data_points[i].rc = sign(sapi_context, object_handle,
+                                         &scenario->sign.scheme, &scenario->sign.digest, &signature,
+                                         &result->data_points[i].duration_s);
+
+        if(result->data_points[i].rc == TPM2_RC_SUCCESS) {
+            TPMI_ALG_HASH *hash = NULL;
+            TPM2B_PUBLIC_KEY_RSA *sig = NULL;
+            switch (signature.sigAlg) {
+                case TPM2_ALG_RSAPSS:
+                    hash = &signature.signature.rsapss.hash;
+                    sig = &signature.signature.rsapss.sig;
+                    break;
+                case TPM2_ALG_RSASSA:
+                    hash = &signature.signature.rsassa.hash;
+                    sig = &signature.signature.rsassa.sig;
+                    break;
+                default:
+                    log_warning("Cryptoops rsa: Unknown signature algorithm %04x", signature.sigAlg);
+            }
+            result->data_points[i].rsa.algorithm_id = signature.sigAlg;
+            result->data_points[i].rsa.digest_size = scenario->sign.digest.size;
+            memcpy(&result->data_points[i].rsa.digest, scenario->sign.digest.buffer, scenario->sign.digest.size);
+
+            if(hash) {
+                result->data_points[i].rsa.hash_id = *hash;
+            }
+            if(sig) {
+                result->data_points[i].rsa.signature_size = sig->size;
+                memcpy(&result->data_points[i].rsa.signature, sig->buffer, sig->size);
+            }
+
+            if (!scenario->sign.no_export) {
+                struct exported_keypair keypair;
+                export_keypair(sapi_context, primary_handle, &outPublic, &outPrivate, &keypair);
+
+                result->data_points[i].rsa.private_key_size = keypair.private_key.rsa.size;
+                memcpy(&result->data_points[i].rsa.private_key, keypair.private_key.rsa.buffer, keypair.private_key.rsa.size);
+
+                result->data_points[i].rsa.public_key_size = keypair.public_key.rsa.size;
+                memcpy(&result->data_points[i].rsa.public_key, keypair.public_key.rsa.buffer, keypair.public_key.rsa.size);
+            }
+        }
+        ++result->size;
+        log_info("Cryptoops rsa %d: scheme %04x | duration %f | rc %04x",
+                 i, scenario->sign.scheme.scheme,
+                 result->data_points[i].duration_s, result->data_points[i].rc);
+
+        printf("%lu%%\n", inc_and_get_progress_percentage(prog));
+    }
+
+    Tss2_Sys_FlushContext(sapi_context, object_handle);
+    return true;
+}
+
+void run_rsa_on_primary(
+        TSS2_SYS_CONTEXT *sapi_context,
+        const struct cryptoops_scenario *scenario,
+        TPMI_DH_OBJECT primary_handle,
+        struct progress *prog)
+{
+    struct cryptoops_result result;
+    if (!alloc_result(scenario, &result)) {
+        log_error("Cryptoops rsa: cannot allocate memory for result.");
+        return;
+    }
+
+    if(run_rsa_sign(sapi_context, scenario, primary_handle, &result, prog)) {
+        output_rsa_results(scenario, &result);
+    }
+    free_result(&result);
+}
+
+unsigned long count_supported_cryptoops_scenarios(
         TSS2_SYS_CONTEXT *sapi_context,
         const struct scenario_parameters *parameters)
 {
@@ -256,20 +382,22 @@ unsigned long count_supported_nonce_scenarios(
 
     if (command_in_options("sign")) {
         scenario.command_code = TPM2_CC_Sign;
-        scenario.nonce.key_params = (TPMT_PUBLIC_PARMS) { .type = TPM2_ALG_NULL };
-        scenario.nonce.scheme = (TPMT_SIG_SCHEME) { .scheme = TPM2_ALG_NULL };
-        scenario.nonce.digest = (struct TPM2B_DIGEST) { .size = 32 }; // Using SHA256
-        memset(&scenario.nonce.digest.buffer, 0x00, scenario.nonce.digest.size);
-        while (get_next_asym_key_params(&scenario.nonce.key_params)) {
-            while (get_next_sign_scheme(&scenario.nonce.scheme, scenario.nonce.key_params.type)) {
-                TPM2B_PUBLIC inPublic = prepare_template(&scenario.nonce.key_params);
+        scenario.sign = (struct cryptoops_sign_scenario) {
+                .key_params = { .type = TPM2_ALG_NULL },
+                .scheme = { .scheme = TPM2_ALG_NULL },
+                .digest = { .size = 32 }, // Using SHA256
+        };
+        memset(&scenario.sign.digest.buffer, 0x00, scenario.sign.digest.size);
+        while (get_next_asym_key_params(&scenario.sign.key_params)) {
+            while (get_next_sign_scheme(&scenario.sign.scheme, scenario.sign.key_params.type)) {
+                TPM2B_PUBLIC inPublic = prepare_template(&scenario.sign.key_params);
 
                 TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
                 if (rc == TPM2_RC_SUCCESS) {
                     total += scenario.parameters.repetitions;
                 }
             }
-            scenario.nonce.scheme.scheme = TPM2_ALG_NULL;
+            scenario.sign.scheme.scheme = TPM2_ALG_NULL;
         }
     }
 
@@ -285,41 +413,38 @@ void run_cryptoops_scenarios(
     };
     struct progress prog;
 
-    prog.total = count_supported_nonce_scenarios(sapi_context, parameters);
+    prog.total = count_supported_cryptoops_scenarios(sapi_context, parameters);
     prog.current = 0;
 
     TPMI_DH_OBJECT primary_handle;
-    log_info("Cryptoops nonce: Creating primary key...");
+    log_info("Cryptoops ecc: Creating primary key...");
     TPM2_RC rc = create_primary_ECC_NIST_P256(sapi_context, &primary_handle);
     if (rc != TPM2_RC_SUCCESS) {
-        log_error("Cryptoops nonce: Failed to create primary key!");
+        log_error("Cryptoops ecc: Failed to create primary key!");
         return;
     } else {
-        log_info("Cryptoops nonce: Created primary key with handle %08x", primary_handle);
+        log_info("Cryptoops ecc: Created primary key with handle %08x", primary_handle);
     }
 
     if (command_in_options("sign")) {
         scenario.command_code = TPM2_CC_Sign;
-        scenario.nonce.key_params = (TPMT_PUBLIC_PARMS) { .type = TPM2_ALG_NULL };
-        scenario.nonce.scheme = (TPMT_SIG_SCHEME) { .scheme = TPM2_ALG_NULL };
-        scenario.nonce.digest = (struct TPM2B_DIGEST) { .size = 32 }; // Using SHA256
-        memset(&scenario.nonce.digest.buffer, 0x00, scenario.nonce.digest.size);
-
-        scenario.nonce.key_params.type = TPM2_ALG_ECC;
-        if (type_in_options("ecc")) {
-            scenario.nonce.key_params.parameters.eccDetail = (TPMS_ECC_PARMS) {
-                    .symmetric = TPM2_ALG_NULL,
-                    .scheme = TPM2_ALG_NULL,
-                    .curveID = 0x0000,
-                    .kdf = TPM2_ALG_NULL
-            };
-        }
-
-        while (get_next_ecc_curve(&scenario.nonce.key_params.parameters.eccDetail.curveID)) {
-            while (get_next_sign_scheme(&scenario.nonce.scheme, scenario.nonce.key_params.type)) {
-                run_nonce_on_primary(sapi_context, &scenario, primary_handle, &prog);
+        scenario.sign = (struct cryptoops_sign_scenario) {
+                .key_params = { .type = TPM2_ALG_NULL },
+                .scheme = { .scheme = TPM2_ALG_NULL },
+                .digest = { .size = 32 }, // Using SHA256
+        };
+        memset(&scenario.sign.digest.buffer, 0x00, scenario.sign.digest.size);
+        while (get_next_asym_key_params(&scenario.sign.key_params)) {
+            while (get_next_sign_scheme(&scenario.sign.scheme, scenario.sign.key_params.type)) {
+                if(scenario.sign.key_params.type == TPM2_ALG_ECC) {
+                    run_ecc_sign_on_primary(sapi_context, &scenario, primary_handle, &prog);
+                } else if(scenario.sign.key_params.type == TPM2_ALG_RSA) {
+                    run_rsa_on_primary(sapi_context, &scenario, primary_handle, &prog);
+                } else {
+                    log_error("Cryptoops: Unknown signing algorithm %04x", scenario.sign.key_params.type);
+                }
             }
-            scenario.nonce.scheme.scheme = TPM2_ALG_NULL;
+            scenario.sign.scheme.scheme = TPM2_ALG_NULL;
         }
     }
 
