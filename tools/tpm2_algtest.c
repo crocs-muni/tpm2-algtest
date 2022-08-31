@@ -4,7 +4,7 @@
 #include "logging.h"
 #include "keygen.h"
 #include "perf.h"
-#include "nonce.h"
+#include "cryptoops.h"
 #include "rng.h"
 
 #include "tpm2_tool.h"
@@ -109,9 +109,9 @@ int tpm2_tool_onrun(TSS2_SYS_CONTEXT *sapi_context, tpm2_option_flags flags)
         run_keygen_scenarios(sapi_context, &parameters);
     }
 
-    if (scenario_in_options("nonce")) {
+    if (scenario_in_options("cryptoops")) {
         set_parameters_from_options(&parameters);
-        run_nonce_scenarios(sapi_context, &parameters);
+        run_cryptoops_scenarios(sapi_context, &parameters);
     }
 
     if (scenario_in_options("rng")) {
