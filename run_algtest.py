@@ -210,7 +210,7 @@ def compute_nonce(filename):
         for row in rows:
             writer.writerow(row)
 
-def nonce(args):
+def cryptoops(args):
     detail_dir = os.path.join(args.outdir, 'detail')
     if args.docker:
         run_command = [ 'docker', 'run', '-it', '--init', '--device=' + device,
@@ -218,11 +218,11 @@ def nonce(args):
                 'simonstruk/tpm2-algtest:' + image_tag ]
     else:
         run_command = [ 'sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir ]
-    run_command += ['-T', 'device', '-s', 'nonce' ]
+    run_command += ['-T', 'device', '-s', 'cryptoops' ]
     add_args(run_command, args)
 
-    print('Running ECC nonce test...')
-    with open(os.path.join(detail_dir, 'nonce_log.txt'), 'w') as logfile:
+    print('Running cryptoops test...')
+    with open(os.path.join(detail_dir, 'cryptoops_log.txt'), 'w') as logfile:
         run_algtest(run_command, logfile)
 
     print('Computing ECC nonces...')
@@ -441,9 +441,9 @@ def main():
         os.makedirs(detail_dir, exist_ok=True)
         perf(args)
         zip(args.outdir)
-    elif args.test == 'nonce':
+    elif args.test == 'cryptoops':
         os.makedirs(detail_dir, exist_ok=True)
-        nonce(args)
+        cryptoops(args)
         zip(args.outdir)
     elif args.test == 'rng':
         os.makedirs(detail_dir, exist_ok=True)
@@ -455,7 +455,7 @@ def main():
             f.write(image_tag)
         quicktest(args, detail_dir)
         keygen(args)
-        nonce(args)
+        cryptoops(args)
         rng(args)
         perf(args)
         create_result_files(args.outdir)
@@ -468,7 +468,7 @@ def main():
         create_result_files(args.outdir)
         zip(args.outdir)
     else:
-        print('invalid test type, needs to be one of: fulltest, quicktest, keygen, nonce, rng, perf, format')
+        print('invalid test type, needs to be one of: fulltest, quicktest, keygen, cryptoops, rng, perf, format')
 
 if __name__ == '__main__':
     main()
