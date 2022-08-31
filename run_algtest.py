@@ -64,7 +64,7 @@ def run_algtest(run_command, logfile):
         logfile.write(line)
     proc.wait()
 
-def compute_rsa_privates(filename):
+def compute_rsa_privates(filename,sep=";"):
     def extended_euclidean(a, b):
         x0, x1, y0, y1 = 0, 1, 1, 0
         while a != 0:
@@ -91,8 +91,7 @@ def compute_rsa_privates(filename):
             e = int(row['e'], 16)
             p = int(row['p'], 16)
         except Exception:
-            print(f"Cannot compute row {row['id']}")
-            return
+            return False
         q = n // p
         totient = (p - 1) * (q - 1)
         _, d, _ = extended_euclidean(e, totient)
@@ -100,23 +99,28 @@ def compute_rsa_privates(filename):
 
         message = 12345678901234567890
         assert mod_exp(mod_exp(message, e, n), d, n) == message, \
-            f"something went wrong (row {row['id']})"
+            f"Something went wrong (row {row['id']})"
 
         row['q'] = '%X' % q
         row['d'] = '%X' % d
+        return True
 
     rows = []
     with open(filename) as infile:
-        reader = csv.DictReader(infile, delimiter=';')
+        reader = csv.DictReader(infile, delimiter=sep)
         for row in reader:
             rows.append(row)
 
+    failed = 0
     for row in rows:
-        compute_row(row)
+        failed += 0 if compute_row(row) else 1
+
+    if failed > 0:
+        print(f"Computation of {failed} rows failed")
 
     with open(filename, 'w') as outfile:
         writer = csv.DictWriter(
-                outfile, delimiter=';', fieldnames=list(rows[0].keys()))
+                outfile, delimiter=sep, fieldnames=list(rows[0].keys()))
         writer.writeheader()
         for row in rows:
             writer.writerow(row)
@@ -191,8 +195,8 @@ def compute_nonce(filename):
             }[algorithm](CURVE_ORDER[curve], signature_r, signature_s, private_key, digest))[2:]
 
         except Exception:
-            print(f"Cannot compute row {row['id']}")
-            return
+            return False
+        return True
 
     rows = []
     with open(filename) as infile:
@@ -200,8 +204,12 @@ def compute_nonce(filename):
         for row in reader:
             rows.append(row)
 
+    failed = 0
     for row in rows:
-        compute_row(row)
+        failed += 0 if compute_row(row) else 1
+
+    if failed > 0:
+        print(f"Computation of {failed} rows failed")
 
     with open(filename, 'w') as outfile:
         writer = csv.DictWriter(
@@ -226,9 +234,14 @@ def cryptoops(args):
         run_algtest(run_command, logfile)
 
     print('Computing ECC nonces...')
-    for filename in glob.glob(os.path.join(detail_dir, 'Nonce:ECC_*.csv')):
+    for filename in glob.glob(os.path.join(detail_dir, 'Cryptoops_Sign:ECC_*.csv')):
         print(filename)
         compute_nonce(filename)
+
+    print('Computing RSA privates...')
+    for filename in glob.glob(os.path.join(detail_dir, 'Cryptoops_Sign:RSA_*.csv')):
+        print(filename)
+        compute_rsa_privates(filename, sep=",")
 
 
 def rng(args):
