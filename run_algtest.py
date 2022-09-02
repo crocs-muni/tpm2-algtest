@@ -26,22 +26,40 @@ def quicktest(args, detail_dir):
 
     print('Running quicktest...')
     with open(os.path.join(detail_dir, 'Quicktest_algorithms.txt'), 'w') as outfile:
-        subprocess.run(run_command + ['-c', 'algorithms'], stdout=outfile).check_returncode()
+        try:
+            subprocess.run(run_command + ['-c', 'algorithms'], stdout=outfile).check_returncode()
+        except:
+            subprocess.run(run_command + ['algorithms'], stdout=outfile).check_returncode()
 
     with open(os.path.join(detail_dir, 'Quicktest_commands.txt'), 'w') as outfile:
-        subprocess.run(run_command + ['-c', 'commands'], stdout=outfile).check_returncode()
+        try:
+            subprocess.run(run_command + ['-c', 'commands'], stdout=outfile).check_returncode()
+        except:
+            subprocess.run(run_command + ['commands'], stdout=outfile).check_returncode()
 
     with open(os.path.join(detail_dir, 'Quicktest_properties-fixed.txt'), 'w') as outfile:
-        subprocess.run(run_command + ['-c', 'properties-fixed'], stdout=outfile).check_returncode()
+        try:
+            subprocess.run(run_command + ['-c', 'properties-fixed'], stdout=outfile).check_returncode()
+        except:
+            subprocess.run(run_command + ['properties-fixed'], stdout=outfile).check_returncode()
 
     with open(os.path.join(detail_dir, 'Quicktest_properties-variable.txt'), 'w') as outfile:
-        subprocess.run(run_command + ['-c', 'properties-variable'], stdout=outfile).check_returncode()
+        try:
+            subprocess.run(run_command + ['-c', 'properties-variable'], stdout=outfile).check_returncode()
+        except:
+            subprocess.run(run_command + ['properties-variable'], stdout=outfile).check_returncode()
 
     with open(os.path.join(detail_dir, 'Quicktest_ecc-curves.txt'), 'w') as outfile:
-        subprocess.run(run_command + ['-c', 'ecc-curves'], stdout=outfile).check_returncode()
+        try:
+            subprocess.run(run_command + ['-c', 'ecc-curves'], stdout=outfile).check_returncode()
+        except:
+            subprocess.run(run_command + ['ecc-curves'], stdout=outfile).check_returncode()
 
     with open(os.path.join(detail_dir, 'Quicktest_handles-persistent.txt'), 'w') as outfile:
-        subprocess.run(run_command + ['-c', 'handles-persistent'], stdout=outfile).check_returncode()
+        try:
+            subprocess.run(run_command + ['-c', 'handles-persistent'], stdout=outfile).check_returncode()
+        except:
+            subprocess.run(run_command + ['handles-persistent'], stdout=outfile).check_returncode()
 
 def add_args(run_command, args):
     if args.num:
@@ -262,7 +280,11 @@ def rng(args):
 
 def get_tpm_id(detail_dir):
     def get_val(line):
-        return line[line.find('0x') + 2:-1]
+        pos = line.find('0x')
+        if pos == -1:
+            return None
+        val = line[line.find('0x') + 2:-1]
+        return "0" * (8 - len(val)) + val
 
     manufacturer = ''
     vendor_str = ''
@@ -270,23 +292,19 @@ def get_tpm_id(detail_dir):
     qt_properties = os.path.join(detail_dir, 'Quicktest_properties-fixed.txt')
     if os.path.isfile(qt_properties):
         with open(os.path.join(detail_dir, 'Quicktest_properties-fixed.txt'), 'r') as properties_file:
-            read_vendor_str = False
+            lines = properties_file.readlines()
             fw1 = ''
             fw2 = ''
-            for line in properties_file:
-                if read_vendor_str:
-                    vendor_str += bytearray.fromhex(get_val(line)).decode()
-                    read_vendor_str = False
-                elif line.startswith('TPM_PT_MANUFACTURER'):
-                    manufacturer = bytearray.fromhex(get_val(line)).decode()
-                elif line.startswith('TPM_PT_FIRMWARE_VERSION_1'):
-                    fw1 = line[line.find('0x') + 2:-1]
-                    assert(len(fw1) == 8)
-                elif line.startswith('TPM_PT_FIRMWARE_VERSION_2'):
-                    fw2 = line[line.find('0x') + 2:-1]
-                    assert(len(fw2) == 8)
-                elif line.startswith('TPM_PT_VENDOR_STRING_'):
-                    read_vendor_str = True
+            for idx, line in enumerate(lines):
+                val = get_val(lines[idx]) or get_val(lines[idx + 1])
+                if line.startswith('TPM2_PT_MANUFACTURER'):
+                    manufacturer = bytearray.fromhex(val).decode()
+                elif line.startswith('TPM2_PT_FIRMWARE_VERSION_1'):
+                    fw1 = val
+                elif line.startswith('TPM2_PT_FIRMWARE_VERSION_2'):
+                    fw2 = val
+                elif line.startswith('TPM2_PT_VENDOR_STRING_'):
+                    vendor_str += bytearray.fromhex(val).decode()
             fw = str(int(fw1[0:4], 16)) + '.' + str(int(fw1[4:8], 16)) + '.' + str(int(fw2[0:4], 16)) + '.' + str(int(fw2[4:8], 16))
 
     manufacturer = manufacturer.replace('\0', '')
@@ -353,10 +371,9 @@ def write_support_file(support_file, detail_dir):
             support_file.write('\nQuicktest_algorithms\n')
             with open(qt_algorithms, 'r') as infile:
                 for line in infile:
-                    if line.startswith('TPMA_ALGORITHM'):
+                    if line.startswith('  value:'):
                         line = line[line.find('0x'):]
-                        line = line[:line.find(' ')]
-                        support_file.write(line + '\n')
+                        support_file.write(line)
 
         qt_commands = os.path.join(detail_dir, 'Quicktest_commands.txt')
         if os.path.isfile(qt_commands):
