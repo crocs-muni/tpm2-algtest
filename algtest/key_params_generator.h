@@ -19,3 +19,5 @@ bool get_next_sym_mode(TPMI_ALG_SYM_MODE *mode);
 bool get_next_hash_algorithm(TPMI_ALG_HASH *hash_alg);
 
 bool get_next_ecc_curve(TPMI_ECC_CURVE *curve);
+
+bool get_next_zgen_scheme(TPMI_ECC_KEY_EXCHANGE *scheme);

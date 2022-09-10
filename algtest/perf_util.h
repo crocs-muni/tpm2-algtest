@@ -56,3 +56,21 @@ TPM2_RC hash(
         const TPM2B_MAX_BUFFER *data,
         TPMI_ALG_HASH hashAlg,
         double *duration);
+
+TPM2_RC ec_ephemeral(
+        TSS2_SYS_CONTEXT *sapi_context,
+        TPMI_ECC_CURVE curveID,
+        TPM2B_ECC_POINT *outPoint,
+        UINT16 *counter,
+        double *duration);
+
+TPM2_RC zgen_2phase(
+        TSS2_SYS_CONTEXT *sapi_context,
+        TPMI_DH_OBJECT keyHandle,
+        const TPM2B_ECC_POINT *inQsB,
+        const TPM2B_ECC_POINT *inQeB,
+        TPMI_ECC_KEY_EXCHANGE inScheme,
+        UINT16 counter,
+        TPM2B_ECC_POINT *outZ1,
+        TPM2B_ECC_POINT *outZ2,
+        double *duration);

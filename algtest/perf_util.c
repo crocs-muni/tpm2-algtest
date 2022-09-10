@@ -216,3 +216,62 @@ TPM2_RC hash(
     return rc;
 }
 
+TPM2_RC ec_ephemeral(
+        TSS2_SYS_CONTEXT *sapi_context,
+        TPMI_ECC_CURVE curveID,
+        TPM2B_ECC_POINT *outPoint,
+        UINT16 *counter,
+        double *duration)
+{
+    /* Cmd parameters */
+    TSS2L_SYS_AUTH_COMMAND cmdAuthsArray = prepare_session();
+
+    /* Rsp parameters */
+    TSS2L_SYS_AUTH_RESPONSE rspAuthsArray;
+
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    TPM2_RC rc = Tss2_Sys_EC_Ephemeral(sapi_context, NULL,
+                               curveID,
+                               outPoint, counter,
+                               &rspAuthsArray);
+
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    if (duration != NULL) {
+        *duration = get_duration_s(&start, &end);
+    }
+    return rc;
+}
+
+TPM2_RC zgen_2phase(
+        TSS2_SYS_CONTEXT *sapi_context,
+        TPMI_DH_OBJECT keyHandle,
+        const TPM2B_ECC_POINT *inQsB,
+        const TPM2B_ECC_POINT *inQeB,
+        TPMI_ECC_KEY_EXCHANGE inScheme,
+        UINT16 counter,
+        TPM2B_ECC_POINT *outZ1,
+        TPM2B_ECC_POINT *outZ2,
+        double *duration)
+{
+    /* Cmd parameters */
+    TSS2L_SYS_AUTH_COMMAND cmdAuthsArray = prepare_session();
+
+    /* Rsp parameters */
+    TSS2L_SYS_AUTH_RESPONSE rspAuthsArray;
+
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    TPM2_RC rc = Tss2_Sys_ZGen_2Phase(sapi_context, keyHandle, &cmdAuthsArray,
+                                      inQsB, inQeB, inScheme, counter,
+                                      outZ1, outZ2,
+                                      &rspAuthsArray);
+
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    if (duration != NULL) {
+        *duration = get_duration_s(&start, &end);
+    }
+    return rc;
+}

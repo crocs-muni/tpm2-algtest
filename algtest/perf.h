@@ -37,6 +37,11 @@ struct perf_hash_scenario {
     TPMI_ALG_HASH hash_alg;
 };
 
+struct perf_zgen_scenario {
+    TPMT_PUBLIC_PARMS key_params;
+    TPMI_ECC_KEY_EXCHANGE scheme;
+};
+
 struct perf_scenario {
     struct scenario_parameters parameters;
     TPM2_CC command_code;
@@ -47,12 +52,14 @@ struct perf_scenario {
         struct perf_rsa_decrypt_scenario rsa_decrypt;
         struct perf_encryptdecrypt_scenario encryptdecrypt;
         struct perf_hash_scenario hash;
+        struct perf_zgen_scenario zgen;
     };
 };
 
 
 struct perf_data_point {
     double duration_s;
+    double duration_extra_s;
     TPM2_RC rc;
 };
 

@@ -102,16 +102,28 @@ void output_results(
     case TPM2_CC_Hash:
         snprintf(filename, 256, "Perf_Hash:0x%04x.csv", scenario->hash.hash_alg);
         break;
+    case TPM2_CC_ZGen_2Phase:
+        snprintf(filename, 256, "Perf_ZGen:0x%04x_0x%04x.csv", scenario->zgen.key_params.parameters.eccDetail.curveID, scenario->zgen.scheme);
+        break;
     default:
         log_error("Perf: (output_results) Command not supported.");
         return;
     }
     if (!fn_valid) { return; }
 
-    FILE *out = open_csv(filename, "duration,return_code");
-    for (int i = 0; i < result->size; ++i) {
-        struct perf_data_point *dp = &result->data_points[i];
-        fprintf(out, "%f, %04x\n", dp->duration_s, dp->rc);
+    FILE *out;
+    if (scenario->command_code == TPM2_CC_ZGen_2Phase) {
+        out = open_csv(filename, "duration,duration_extra,return_code");
+        for (int i = 0; i < result->size; ++i) {
+            struct perf_data_point *dp = &result->data_points[i];
+            fprintf(out, "%f,%f,%04x\n", dp->duration_s, dp->duration_extra_s, dp->rc);
+        }
+    } else {
+        out = open_csv(filename, "duration,return_code");
+        for (int i = 0; i < result->size; ++i) {
+            struct perf_data_point *dp = &result->data_points[i];
+            fprintf(out, "%f,%04x\n", dp->duration_s, dp->rc);
+        }
     }
     fclose(out);
 }
@@ -463,6 +475,66 @@ bool run_perf_hmac(
     return true;
 }
 
+bool run_perf_zgen(
+        TSS2_SYS_CONTEXT *sapi_context,
+        const struct perf_scenario *scenario,
+        TPMI_DH_OBJECT primary_handle,
+        struct perf_result *result,
+        struct progress *prog)
+{
+    TPM2B_PUBLIC inPublic = prepare_template(&scenario->zgen.key_params);
+    // Key needs DECRYPT attribute for ZGEN
+    inPublic.publicArea.objectAttributes |= TPMA_OBJECT_DECRYPT;
+
+    TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
+    if (rc != TPM2_RC_SUCCESS) {
+        return false;
+    }
+
+    TPM2_HANDLE object_handle;
+    log_info("Perf zgen: Generating static key...");
+    rc = create_loaded(sapi_context, &inPublic, primary_handle, &object_handle);
+    if (rc != TPM2_RC_SUCCESS) {
+        log_error("Perf zgen: Error when creating static key %04x", rc);
+        Tss2_Sys_FlushContext(sapi_context, object_handle);
+        return false;
+    }
+    result->size = 0;
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    for (unsigned i = 0; i < scenario->parameters.repetitions; ++i) {
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        if (get_duration_s(&start, &end) > scenario->parameters.max_duration_s) {
+            break;
+        }
+
+        TPM2B_ECC_POINT point = { .size = 0 };
+        UINT16 counter = 0;
+        result->data_points[i].rc = ec_ephemeral(sapi_context, scenario->zgen.key_params.parameters.eccDetail.curveID,
+                                                 &point, &counter, &result->data_points[i].duration_extra_s);
+
+        log_info("Perf zgen p1 %d: curve %04x | duration %f | rc %04x",
+                 i, scenario->zgen.key_params.parameters.eccDetail.curveID,
+                 result->data_points[i].duration_extra_s, result->data_points[i].rc);
+
+
+        TPM2B_ECC_POINT outZ1 = { .size = 0 };
+        TPM2B_ECC_POINT outZ2 = { .size = 0 };
+        result->data_points[i].rc = zgen_2phase(sapi_context, object_handle, &point, &point, scenario->zgen.scheme, counter, &outZ1, &outZ2, &result->data_points[i].duration_s);
+        log_info("Perf zgen p2 %d: curve %04x | scheme %04x | duration %f | rc %04x",
+                 i, scenario->zgen.key_params.parameters.eccDetail.curveID, scenario->zgen.scheme,
+                 result->data_points[i].duration_s, result->data_points[i].rc);
+
+        ++result->size;
+
+        printf("%lu%%\n", inc_and_get_progress_percentage(prog));
+    }
+
+    Tss2_Sys_FlushContext(sapi_context, object_handle);
+    return true;
+}
+
 void run_perf_on_primary(
         TSS2_SYS_CONTEXT *sapi_context,
         const struct perf_scenario *scenario,
@@ -494,6 +566,9 @@ void run_perf_on_primary(
         break;
     case TPM2_CC_HMAC:
         ok = run_perf_hmac(sapi_context, scenario, primary_handle, &result, prog);
+        break;
+    case TPM2_CC_ZGen_2Phase:
+        ok = run_perf_zgen(sapi_context, scenario, primary_handle, &result, prog);
         break;
     default:
         log_warning("Perf: unsupported command code %04x", scenario->command_code);
@@ -740,6 +815,35 @@ unsigned long count_supported_perf_scenarios(
         }
     }
 
+    if (command_in_options("zgen")) {
+        scenario.command_code = TPM2_CC_ZGen_2Phase;
+        scenario.zgen = (struct perf_zgen_scenario) {
+                .key_params = {
+                        .type = TPM2_ALG_ECC,
+                        .parameters.eccDetail = {
+                                .curveID = TPM2_ECC_NONE,
+                                .scheme = TPM2_ALG_NULL,
+                                .kdf = TPM2_ALG_NULL,
+                                .symmetric = TPM2_ALG_NULL,
+                        },
+                },
+                .scheme = TPM2_ALG_NULL,
+        };
+
+        while (get_next_ecc_curve(&scenario.zgen.key_params.parameters.eccDetail.curveID)) {
+            while (get_next_zgen_scheme(&scenario.zgen.scheme)) {
+                TPM2B_PUBLIC inPublic = prepare_template(&scenario.zgen.key_params);
+                inPublic.publicArea.objectAttributes |= TPMA_OBJECT_DECRYPT;
+
+                TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
+                if (rc == TPM2_RC_SUCCESS) {
+                    total += scenario.parameters.repetitions;
+                }
+            }
+            scenario.zgen.scheme = TPM2_ALG_NULL;
+        }
+    }
+
     return total;
 }
 
@@ -862,6 +966,28 @@ void run_perf_scenarios(
         scenario.hash.hash_alg = TPM2_ALG_NULL;
         while (get_next_hash_algorithm(&scenario.hash.hash_alg)) {
             run_perf_hash(sapi_context, &scenario, &prog);
+        }
+    }
+
+    if (command_in_options("zgen")) {
+        scenario.command_code = TPM2_CC_ZGen_2Phase;
+        scenario.zgen = (struct perf_zgen_scenario) {
+                .key_params = {
+                        .type = TPM2_ALG_ECC,
+                        .parameters.eccDetail = {
+                                .curveID = TPM2_ECC_NONE,
+                                .scheme = TPM2_ALG_NULL,
+                                .kdf = TPM2_ALG_NULL,
+                                .symmetric = TPM2_ALG_NULL,
+                        },
+                },
+                .scheme = TPM2_ALG_NULL,
+        };
+        while (get_next_ecc_curve(&scenario.zgen.key_params.parameters.eccDetail.curveID)) {
+            while (get_next_zgen_scheme(&scenario.zgen.scheme)) {
+                run_perf_on_primary(sapi_context, &scenario, primary_handle, &prog);
+            }
+            scenario.zgen.scheme = TPM2_ALG_NULL;
         }
     }
 
