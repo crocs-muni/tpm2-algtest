@@ -295,6 +295,24 @@ bool get_next_sign_scheme(TPMT_SIG_SCHEME *scheme, TPM2_ALG_ID type)
     }
 }
 
+bool get_next_zgen_scheme(TPMI_ECC_KEY_EXCHANGE *scheme)
+{
+    switch(*scheme) {
+    case TPM2_ALG_NULL:
+        *scheme = TPM2_ALG_ECDH;
+        return true;
+    case TPM2_ALG_ECDH:
+        *scheme = TPM2_ALG_ECMQV;
+        return true;
+    case TPM2_ALG_ECMQV:
+        *scheme = TPM2_ALG_SM2;
+        return true;
+    case TPM2_ALG_SM2:
+        return false;
+    }
+    return false;
+}
+
 bool get_next_hash_algorithm(TPMI_ALG_HASH *hash_alg)
 {
     switch (*hash_alg) {
