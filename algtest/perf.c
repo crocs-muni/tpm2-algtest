@@ -111,19 +111,10 @@ void output_results(
     }
     if (!fn_valid) { return; }
 
-    FILE *out;
-    if (scenario->command_code == TPM2_CC_ZGen_2Phase) {
-        out = open_csv(filename, "duration,duration_extra,return_code");
-        for (int i = 0; i < result->size; ++i) {
-            struct perf_data_point *dp = &result->data_points[i];
-            fprintf(out, "%f,%f,%04x\n", dp->duration_s, dp->duration_extra_s, dp->rc);
-        }
-    } else {
-        out = open_csv(filename, "duration,return_code");
-        for (int i = 0; i < result->size; ++i) {
-            struct perf_data_point *dp = &result->data_points[i];
-            fprintf(out, "%f,%04x\n", dp->duration_s, dp->rc);
-        }
+    FILE *out = open_csv(filename, "duration,duration_extra,return_code");
+    for (int i = 0; i < result->size; ++i) {
+        struct perf_data_point *dp = &result->data_points[i];
+        fprintf(out, "%f,%f,%04x\n", dp->duration_s, dp->duration_extra_s, dp->rc);
     }
     fclose(out);
 }
@@ -136,6 +127,11 @@ bool run_perf_sign(
         struct progress *prog)
 {
     TPM2B_PUBLIC inPublic = prepare_template(&scenario->sign.key_params);
+    if(scenario->sign.scheme.scheme == TPM2_ALG_ECDAA) {
+        inPublic.publicArea.parameters.eccDetail.scheme.scheme = TPM2_ALG_ECDAA;
+        inPublic.publicArea.parameters.eccDetail.scheme.details.ecdaa.hashAlg = TPM2_ALG_SHA256;
+        inPublic.publicArea.parameters.eccDetail.scheme.details.ecdaa.count = 0; // Most likely can be removed without any side effects.
+    }
 
     TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
     if (rc != TPM2_RC_SUCCESS) {
@@ -162,7 +158,7 @@ bool run_perf_sign(
         TPMT_SIGNATURE signature;
         result->data_points[i].rc = sign(sapi_context, object_handle,
                 &scenario->sign.scheme, &scenario->sign.digest, &signature,
-                &result->data_points[i].duration_s);
+                &result->data_points[i].duration_s, &result->data_points[i].duration_extra_s);
 
         ++result->size;
         switch (scenario->sign.key_params.type) {
@@ -210,7 +206,7 @@ bool run_perf_verifysignature(
 
     TPMT_SIGNATURE signature;
     rc = sign(sapi_context, object_handle, &scenario->verifysignature.scheme,
-            &scenario->verifysignature.digest, &signature, NULL);
+            &scenario->verifysignature.digest, &signature, NULL, NULL);
 
     if (rc != TPM2_RC_SUCCESS) {
         log_error("Perf verifysignature: Could not create signature %04x", rc);

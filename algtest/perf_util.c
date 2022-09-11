@@ -1,7 +1,6 @@
 #include "perf_util.h"
 #include "util.h"
 #include "object_util.h"
-#include "logging.h"
 
 #include <time.h>
 
@@ -11,7 +10,8 @@ TPM2_RC sign(
         const TPMT_SIG_SCHEME *inScheme,
         const TPM2B_DIGEST *digest,
         TPMT_SIGNATURE *signature,
-        double *duration)
+        double *duration,
+        double *duration_extra)
 {
     /* Cmd parameters */
     TSS2L_SYS_AUTH_COMMAND cmdAuthsArray = prepare_session();
@@ -22,13 +22,47 @@ TPM2_RC sign(
     };
 
     /* Rsp parameters */
-    TSS2L_SYS_AUTH_RESPONSE rspAuthsArray;
+    TSS2L_SYS_AUTH_RESPONSE rspAuthsArray = { .count = 1 };
 
+    TPMT_SIG_SCHEME inSchemeCopy = *inScheme;
     struct timespec start, end;
+
+    if(inSchemeCopy.scheme == TPM2_ALG_ECDAA) {
+        TPM2B_ECC_POINT p1 = { .size = 0 };
+        TPM2B_SENSITIVE_DATA s2 = { .size = 0 };
+        TPM2B_ECC_PARAMETER y2 = { .size = 0 };
+        TPM2B_ECC_POINT K = { .size = 0 };
+        TPM2B_ECC_POINT L = { .size = 0 };
+        TPM2B_ECC_POINT E = { .size = 0 };
+
+        clock_gettime(CLOCK_MONOTONIC, &start);
+        TPM2_RC rc = Tss2_Sys_Commit(
+                sapi_context,
+                keyHandle,
+                &cmdAuthsArray,
+                &p1,
+                &s2,
+                &y2,
+                &K,
+                &L,
+                &E,
+                &inSchemeCopy.details.ecdaa.count,
+                &rspAuthsArray);
+
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        if (duration_extra != NULL) {
+            *duration_extra = get_duration_s(&start, &end);
+        }
+
+        if(rc != 0) {
+            return rc;
+        }
+    }
+
     clock_gettime(CLOCK_MONOTONIC, &start);
 
     TPM2_RC rc = Tss2_Sys_Sign(sapi_context, keyHandle, &cmdAuthsArray,
-            digest, inScheme, &validation, signature,
+            digest, &inSchemeCopy, &validation, signature,
             &rspAuthsArray);
 
     clock_gettime(CLOCK_MONOTONIC, &end);
@@ -223,9 +257,6 @@ TPM2_RC ec_ephemeral(
         UINT16 *counter,
         double *duration)
 {
-    /* Cmd parameters */
-    TSS2L_SYS_AUTH_COMMAND cmdAuthsArray = prepare_session();
-
     /* Rsp parameters */
     TSS2L_SYS_AUTH_RESPONSE rspAuthsArray;
 

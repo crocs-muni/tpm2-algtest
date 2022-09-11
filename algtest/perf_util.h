@@ -7,7 +7,8 @@ TPM2_RC sign(
         const TPMT_SIG_SCHEME *inScheme,
         const TPM2B_DIGEST *digest,
         TPMT_SIGNATURE *signature,
-        double *duration);
+        double *duration,
+        double *duration_extra);
 
 TPM2_RC verifysignature(
         TSS2_SYS_CONTEXT *sapi_context,
