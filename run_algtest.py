@@ -6,6 +6,8 @@ import sys
 import glob
 import csv
 import datetime
+import hashlib
+import math
 
 device = '/dev/tpm0'
 image_tag = 'v1.0'
@@ -108,7 +110,7 @@ def compute_rsa_privates(filename,sep=";"):
             n = int(row['n'], 16)
             e = int(row['e'], 16)
             p = int(row['p'], 16)
-        except Exception:
+        except:
             return False
         q = n // p
         totient = (p - 1) * (q - 1)
@@ -197,11 +199,19 @@ def compute_nonce(filename):
         # https://crypto.stackexchange.com/questions/9918/reasons-for-chinese-sm2-digital-signature-algorithm
         return (s + (s * x) % n + (r * x) % n) % n
 
+    def extract_ecdaa_nonce(n, r, s, x, e):
+        # https://trustedcomputinggroup.org/wp-content/uploads/TCG_TPM2_r1p59_Part1_Architecture_pub.pdf
+        hasher = hashlib.sha256()
+        hasher.update(int.to_bytes(r, byteorder="big", length=math.ceil(math.log2(n))))
+        hasher.update(int.to_bytes(e, byteorder="big", length=math.ceil(math.log2(n))))
+        h = int.from_bytes(hasher.digest(), byteorder="big")
+        return (s - h * x) % n
+
     def compute_row(row):
         try:
             digest = int(row['digest'], 16)
             curve = { 0x3: "P256", 0x4: "P384", 0x10: "BN256" }[int(row['curve'], 16)]
-            algorithm = { 0x18: "ECDSA", 0x1b: "SM2", 0x1c: "ECSCHNORR" }[int(row['algorithm'], 16)]
+            algorithm = { 0x18: "ECDSA", 0x1a: "ECDAA", 0x1b: "SM2", 0x1c: "ECSCHNORR" }[int(row['algorithm'], 16)]
             signature_r = int(row['signature_r'], 16)
             signature_s = int(row['signature_s'], 16)
             private_key = int(row['private_key'], 16)
@@ -209,10 +219,11 @@ def compute_nonce(filename):
             row['nonce'] = hex({
                 "ECDSA": extract_ecdsa_nonce,
                 "ECSCHNORR": extract_ecschnorr_nonce,
-                "SM2": extract_sm2_nonce
+                "SM2": extract_sm2_nonce,
+                "ECDAA": extract_ecdaa_nonce
             }[algorithm](CURVE_ORDER[curve], signature_r, signature_s, private_key, digest))[2:]
 
-        except Exception:
+        except:
             return False
         return True
 
@@ -496,6 +507,15 @@ def main():
             print('There is no output yet, need to run tests.')
             return
         create_result_files(args.outdir)
+        print('Computing ECC nonces...')
+        for filename in glob.glob(os.path.join(detail_dir, 'Cryptoops_Sign:ECC_*.csv')):
+            print(filename)
+            compute_nonce(filename)
+
+        print('Computing RSA privates...')
+        for filename in glob.glob(os.path.join(detail_dir, 'Cryptoops_Sign:RSA_*.csv')):
+            print(filename)
+            compute_rsa_privates(filename, sep=",")
         zip(args.outdir)
     else:
         print('invalid test type, needs to be one of: fulltest, quicktest, keygen, cryptoops, rng, perf, format')
