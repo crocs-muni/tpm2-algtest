@@ -1,9 +1,9 @@
 #pragma once
+
 #include "scenario.h"
 #include "options.h"
 
 #include <tss2/tss2_sys.h>
-
 
 struct cryptoops_sign_scenario {
     bool no_export;
@@ -57,6 +57,7 @@ struct cryptoops_rsa_data_point {
 
 struct cryptoops_data_point {
     double duration_s;
+    double duration_extra_s;
     TPM2_RC rc;
     union {
         struct cryptoops_ecc_data_point ecc;
