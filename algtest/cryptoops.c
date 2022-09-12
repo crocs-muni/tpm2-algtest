@@ -63,7 +63,7 @@ void output_ecc_results(
     snprintf(filename, 256, "Cryptoops_Sign:ECC_0x%04x_0x%04x.csv",
              scenario->sign.key_params.parameters.eccDetail.curveID, scenario->sign.scheme.scheme);
 
-    FILE *out = open_csv(filename, "id,algorithm,curve,digest,signature_r,signature_s,private_key,public_key_x,public_key_y,duration,duration_extra,return_code");
+    FILE *out = open_csv(filename, "id,algorithm,curve,digest,signature_r,signature_s,private_key,public_key_x,public_key_y,nonce_point_x,nonce_point_y,duration,duration_extra,return_code");
     for (int i = 0; i < result->size; ++i) {
         struct cryptoops_data_point *dp = &result->data_points[i];
         fprintf(out, "%d,%04x,%04x,", i, dp->ecc.algorithm_id, dp->ecc.curve_id);
@@ -89,6 +89,14 @@ void output_ecc_results(
         fprintf(out, ",");
         for(uint16_t j = 0; j < dp->ecc.public_key_y_size; ++j) {
             fprintf(out, "%02x", dp->ecc.public_key_y[j]);
+        }
+        fprintf(out, ",");
+        for(uint16_t j = 0; j < dp->ecc.nonce_point_x_size; ++j) {
+            fprintf(out, "%02x", dp->ecc.nonce_point_x[j]);
+        }
+        fprintf(out, ",");
+        for(uint16_t j = 0; j < dp->ecc.nonce_point_y_size; ++j) {
+            fprintf(out, "%02x", dp->ecc.nonce_point_y[j]);
         }
         fprintf(out, ",%f,%f,%04x\n", dp->duration_s, dp->duration_extra_s, dp->rc);
     }
@@ -179,11 +187,12 @@ bool run_ecc_sign(
         }
 
         TPMT_SIGNATURE signature;
+        TPM2B_ECC_POINT nonce_point = { .size = 0 };
         result->data_points[i].rc = sign(sapi_context, object_handle,
-                &scenario->sign.scheme, &scenario->sign.digest, &signature,
+                &scenario->sign.scheme, &scenario->sign.digest, &signature, &nonce_point,
                 &result->data_points[i].duration_s, &result->data_points[i].duration_extra_s);
 
-        result->data_points[i].ecc.algorithm_id = signature.sigAlg;
+        result->data_points[i].ecc.algorithm_id = scenario->sign.scheme.scheme;
         result->data_points[i].ecc.curve_id = scenario->sign.key_params.parameters.eccDetail.curveID;
         if(result->data_points[i].rc == TPM2_RC_SUCCESS) {
             TPM2B_ECC_PARAMETER *r = NULL, *s = NULL;
@@ -217,6 +226,13 @@ bool run_ecc_sign(
             if(s) {
                 result->data_points[i].ecc.signature_s_size = s->size;
                 memcpy(&result->data_points[i].ecc.signature_s, s->buffer, s->size);
+            }
+            if(nonce_point.size > 0) {
+                result->data_points[i].ecc.nonce_point_x_size = nonce_point.point.x.size;
+                memcpy(&result->data_points[i].ecc.nonce_point_x, nonce_point.point.x.buffer, nonce_point.point.x.size);
+
+                result->data_points[i].ecc.nonce_point_y_size = nonce_point.point.y.size;
+                memcpy(&result->data_points[i].ecc.nonce_point_y, nonce_point.point.y.buffer, nonce_point.point.y.size);
             }
 
             if (!scenario->sign.no_export) {
@@ -310,7 +326,7 @@ bool run_rsa_sign(
 
         TPMT_SIGNATURE signature;
         result->data_points[i].rc = sign(sapi_context, object_handle,
-                                         &scenario->sign.scheme, &scenario->sign.digest, &signature,
+                                         &scenario->sign.scheme, &scenario->sign.digest, &signature, NULL,
                                          &result->data_points[i].duration_s, &result->data_points[i].duration_extra_s);
 
         if(result->data_points[i].rc == TPM2_RC_SUCCESS) {

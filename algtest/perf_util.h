@@ -7,6 +7,7 @@ TPM2_RC sign(
         const TPMT_SIG_SCHEME *inScheme,
         const TPM2B_DIGEST *digest,
         TPMT_SIGNATURE *signature,
+        TPM2B_ECC_POINT *noncePoint,
         double *duration,
         double *duration_extra);
 

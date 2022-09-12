@@ -10,6 +10,7 @@ TPM2_RC sign(
         const TPMT_SIG_SCHEME *inScheme,
         const TPM2B_DIGEST *digest,
         TPMT_SIGNATURE *signature,
+        TPM2B_ECC_POINT *noncePoint,
         double *duration,
         double *duration_extra)
 {
@@ -28,7 +29,7 @@ TPM2_RC sign(
     struct timespec start, end;
 
     if(inSchemeCopy.scheme == TPM2_ALG_ECDAA) {
-        TPM2B_ECC_POINT p1 = { .size = 0 };
+        TPM2B_ECC_POINT p1 = { .size = 4 };
         TPM2B_SENSITIVE_DATA s2 = { .size = 0 };
         TPM2B_ECC_PARAMETER y2 = { .size = 0 };
         TPM2B_ECC_POINT K = { .size = 0 };
@@ -43,11 +44,33 @@ TPM2_RC sign(
                 &p1,
                 &s2,
                 &y2,
-                &K,
+                noncePoint ? noncePoint : &K, // BUG? The rG value seems to be stored here instead of E
                 &L,
                 &E,
                 &inSchemeCopy.details.ecdaa.count,
                 &rspAuthsArray);
+
+        if(L.size > 4) {
+            printf("Unexpected point output in TPM2_Commit: L 04");
+            for(int i = 0; i < L.point.x.size; ++i) {
+                printf("%02x", L.point.x.buffer[i]);
+            }
+            for(int i = 0; i < L.point.y.size; ++i) {
+                printf("%02x", L.point.y.buffer[i]);
+            }
+            printf("\n");
+        }
+
+        if(E.size > 4) {
+            printf("Unexpected point output in TPM2_Commit: E 04");
+            for(int i = 0; i < E.point.x.size; ++i) {
+                printf("%02x", E.point.x.buffer[i]);
+            }
+            for(int i = 0; i < E.point.y.size; ++i) {
+                printf("%02x", E.point.y.buffer[i]);
+            }
+            printf("\n");
+        }
 
         clock_gettime(CLOCK_MONOTONIC, &end);
         if (duration_extra != NULL) {
