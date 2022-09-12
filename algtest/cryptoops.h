@@ -40,6 +40,10 @@ struct cryptoops_ecc_data_point {
     uint8_t public_key_x[TPM2_MAX_ECC_KEY_BYTES];
     uint16_t public_key_y_size;
     uint8_t public_key_y[TPM2_MAX_ECC_KEY_BYTES];
+    uint16_t nonce_point_x_size;
+    uint8_t nonce_point_x[TPM2_MAX_ECC_KEY_BYTES];
+    uint16_t nonce_point_y_size;
+    uint8_t nonce_point_y[TPM2_MAX_ECC_KEY_BYTES];
 };
 
 struct cryptoops_rsa_data_point {

@@ -157,7 +157,7 @@ bool run_perf_sign(
 
         TPMT_SIGNATURE signature;
         result->data_points[i].rc = sign(sapi_context, object_handle,
-                &scenario->sign.scheme, &scenario->sign.digest, &signature,
+                &scenario->sign.scheme, &scenario->sign.digest, &signature, NULL,
                 &result->data_points[i].duration_s, &result->data_points[i].duration_extra_s);
 
         ++result->size;
@@ -206,7 +206,7 @@ bool run_perf_verifysignature(
 
     TPMT_SIGNATURE signature;
     rc = sign(sapi_context, object_handle, &scenario->verifysignature.scheme,
-            &scenario->verifysignature.digest, &signature, NULL, NULL);
+            &scenario->verifysignature.digest, &signature, NULL, NULL, NULL);
 
     if (rc != TPM2_RC_SUCCESS) {
         log_error("Perf verifysignature: Could not create signature %04x", rc);

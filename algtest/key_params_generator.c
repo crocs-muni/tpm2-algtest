@@ -279,7 +279,7 @@ bool get_next_ecc_sign_scheme(TPMT_SIG_SCHEME *scheme)
         return true;
     case TPM2_ALG_ECSCHNORR:
         scheme->scheme = TPM2_ALG_ECDAA;
-        scheme->details = (TPMU_SIG_SCHEME) { .ecdaa = {.hashAlg = TPM2_ALG_SHA256, .count = 1 } };
+        scheme->details = (TPMU_SIG_SCHEME) { .ecdaa = { .hashAlg = TPM2_ALG_SHA256, .count = 1 } };
         return true;
     default:
         return false;
