@@ -24,7 +24,6 @@ FILE *open_csv(const char *filename, const char *header)
     strncat(path, filename, 255 - strlen(path));
     FILE *file = fopen(path, "w");
     if (!file) {
-        char errstr[256] = "cannot open output file ";
         log_error("Cannot open output file %s: %s", path, strerror(errno));
         exit(1);
     }

@@ -101,7 +101,7 @@ void run_rng_getrandom(
         ++result.size;
         log_info("Rng %d: duration %f | rc %04x",
                  i, result.data_points[i].duration_s, result.data_points[i].rc);
-        printf("%u%%\n", inc_and_get_progress_percentage(prog));
+        printf("%lu%%\n", inc_and_get_progress_percentage(prog));
     }
 
     output_results(scenario, &result);
