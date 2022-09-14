@@ -1,7 +1,7 @@
 project(tpm2-algtest C)
 cmake_minimum_required(VERSION 3.10)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -g")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -D_GNU_SOURCE -DOPENSSL_SUPPRESS_DEPRECATED")
 
 set(LIB_SRC ${CMAKE_SOURCE_DIR}/lib)
 set(TOOLS_SRC ${CMAKE_SOURCE_DIR}/tools)

@@ -3,5 +3,5 @@ struct progress {
 	unsigned long current;
 };
 
-unsigned get_progress_percentage(struct progress *prog);
-unsigned inc_and_get_progress_percentage(struct progress *prog);
+unsigned long get_progress_percentage(struct progress *prog);
+unsigned long inc_and_get_progress_percentage(struct progress *prog);

@@ -51,8 +51,7 @@
 #include "tpm2_util.h"
 
 #ifndef VERSION
-  #warning "VERSION Not known at compile time, not embedding..."
-  #define VERSION "UNKNOWN"
+  #define VERSION "TPM2-ALGTEST"
 #endif
 
 #define TPM2TOOLS_ENV_TCTI      "TPM2TOOLS_TCTI"
