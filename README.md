@@ -20,11 +20,7 @@ Additionally, the test generates 1000 ECC key pairs for each available elliptic 
 
 Lastly, there are performance tests for selected TPM operations. This should take 5-10 minutes.
 
-After the tests are finished please send the generated zip file `out.zip` to `xstruk@fi.muni.cz` along with any additional information about the TPM model you might have (optional).
-
 **Important:** If during keygen test you don't see lines ending with `rc 0000`, but see some other number (return code), the key generation fails and it doesn't make sense to continue. Please contact me and send me the `out.zip` file anyway, the logs and TPM info there will still help us. A few erroneous return codes are ok.
-
-If you run into any issues or feel that the computation is taking too long, please contact me on `xstruk@fi.muni.cz`.
 
 ### Troubleshooting
 If the script crashes with this message:

@@ -501,7 +501,7 @@ def main():
         perf(args)
         create_result_files(args.outdir)
         zip(args.outdir)
-        print('The tests are finished. Thank you! Please send the generated file (' + args.outdir + '.zip) to xstruk@fi.muni.cz')
+        print('The tests are finished. Thank you! Please send us the generated file (' + args.outdir + '.zip).')
     elif args.test == 'format':
         if not os.path.exists(detail_dir):
             print('There is no output yet, need to run tests.')
