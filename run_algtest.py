@@ -10,7 +10,7 @@ import hashlib
 import math
 
 device = '/dev/tpm0'
-image_tag = 'v1.0'
+IMAGE_TAG = 'v1.0'
 
 def zip(outdir):
     zipf = zipfile.ZipFile(outdir + '.zip', 'w', zipfile.ZIP_DEFLATED)
@@ -18,48 +18,98 @@ def zip(outdir):
         for file in files:
             zipf.write(os.path.join(root, file))
 
+def get_system_id(detail_dir):
+    uname = None
+    manufacturer = None
+    product_name = None
+    version = None
+    bios_version = None
+
+    system_info = os.path.join(detail_dir, 'dmidecode_system_info.txt')
+    if os.path.isfile(system_info):
+        with open(system_info, 'r') as dmidecode_file:
+            output = dmidecode_file.read().replace("\t", "").split("\n")
+            try:
+                manufacturer = output[1].split(":")[1][1:]
+            except:
+                pass
+
+            try:
+                product_name = output[2].split(":")[1][1:]
+            except:
+                pass
+
+            try:
+                version = output[3].split(":")[1][1:]
+            except:
+                pass
+    system_info = os.path.join(detail_dir, 'dmidecode_bios_version.txt')
+    if os.path.isfile(system_info):
+        with open(system_info, 'r') as dmidecode_bios_file:
+            bios_version = dmidecode_bios_file.readline()[:-1]
+
+    system_info = os.path.join(detail_dir, 'uname_system_info.txt')
+    if os.path.isfile(system_info):
+        with open(system_info, 'r') as uname_file:
+            uname = uname_file.readline()[:-1]
+    return manufacturer, product_name, version, bios_version, uname
+
 def quicktest(args, detail_dir):
     if args.docker:
         run_command = [ 'docker', 'run', '-it', '--init', '--device=' + device,
-                '--entrypoint=tpm2_getcap', 'simonstruk/tpm2-algtest:' + image_tag ]
+                '--entrypoint=tpm2_getcap', 'simonstruk/tpm2-algtest:' + IMAGE_TAG ]
     else:
         run_command = [ 'sudo', 'tpm2_getcap' ]
     run_command += [ '-T', 'device' ]
 
     print('Running quicktest...')
+
+    try:
+        result = subprocess.run("sudo -n dmidecode -s bios-version", stderr=subprocess.STDOUT, stdout=subprocess.PIPE, shell=True)
+        with open(os.path.join(detail_dir, 'dmidecode_bios_version.txt'), 'w') as outfile:
+            outfile.write(result.stdout.decode("ascii"))
+        result = subprocess.run("sudo -n dmidecode | grep -A3 '^System Information'", stderr=subprocess.STDOUT, stdout=subprocess.PIPE, shell=True)
+        with open(os.path.join(detail_dir, 'dmidecode_system_info.txt'), 'w') as outfile:
+            outfile.write(result.stdout.decode("ascii"))
+        result = subprocess.run("uname -a", stderr=subprocess.STDOUT, stdout=subprocess.PIPE, shell=True)
+        with open(os.path.join(detail_dir, 'uname_system_info.txt'), 'w') as outfile:
+            outfile.write(result.stdout.decode("ascii"))
+    except:
+        print("Could not obtain system information")
+
     with open(os.path.join(detail_dir, 'Quicktest_algorithms.txt'), 'w') as outfile:
         try:
-            subprocess.run(run_command + ['-c', 'algorithms'], stdout=outfile).check_returncode()
+            subprocess.run(run_command + ['-c', 'algorithms'], stdout=outfile, stderr=subprocess.DEVNULL).check_returncode()
         except:
-            subprocess.run(run_command + ['algorithms'], stdout=outfile).check_returncode()
+            subprocess.run(run_command + ['algorithms'], stdout=outfile, stderr=subprocess.STDOUT).check_returncode()
 
     with open(os.path.join(detail_dir, 'Quicktest_commands.txt'), 'w') as outfile:
         try:
-            subprocess.run(run_command + ['-c', 'commands'], stdout=outfile).check_returncode()
+            subprocess.run(run_command + ['-c', 'commands'], stdout=outfile, stderr=subprocess.DEVNULL).check_returncode()
         except:
-            subprocess.run(run_command + ['commands'], stdout=outfile).check_returncode()
+            subprocess.run(run_command + ['commands'], stdout=outfile, stderr=subprocess.STDOUT).check_returncode()
 
     with open(os.path.join(detail_dir, 'Quicktest_properties-fixed.txt'), 'w') as outfile:
         try:
-            subprocess.run(run_command + ['-c', 'properties-fixed'], stdout=outfile).check_returncode()
+            subprocess.run(run_command + ['-c', 'properties-fixed'], stdout=outfile, stderr=subprocess.DEVNULL).check_returncode()
         except:
-            subprocess.run(run_command + ['properties-fixed'], stdout=outfile).check_returncode()
+            subprocess.run(run_command + ['properties-fixed'], stdout=outfile, stderr=subprocess.STDOUT).check_returncode()
 
     with open(os.path.join(detail_dir, 'Quicktest_properties-variable.txt'), 'w') as outfile:
         try:
-            subprocess.run(run_command + ['-c', 'properties-variable'], stdout=outfile).check_returncode()
+            subprocess.run(run_command + ['-c', 'properties-variable'], stdout=outfile, stderr=subprocess.DEVNULL).check_returncode()
         except:
-            subprocess.run(run_command + ['properties-variable'], stdout=outfile).check_returncode()
+            subprocess.run(run_command + ['properties-variable'], stdout=outfile, stderr=subprocess.STDOUT).check_returncode()
 
     with open(os.path.join(detail_dir, 'Quicktest_ecc-curves.txt'), 'w') as outfile:
         try:
-            subprocess.run(run_command + ['-c', 'ecc-curves'], stdout=outfile).check_returncode()
+            subprocess.run(run_command + ['-c', 'ecc-curves'], stdout=outfile, stderr=subprocess.DEVNULL).check_returncode()
         except:
             subprocess.run(run_command + ['ecc-curves'], stdout=outfile).check_returncode()
 
     with open(os.path.join(detail_dir, 'Quicktest_handles-persistent.txt'), 'w') as outfile:
         try:
-            subprocess.run(run_command + ['-c', 'handles-persistent'], stdout=outfile).check_returncode()
+            subprocess.run(run_command + ['-c', 'handles-persistent'], stdout=outfile, stderr=subprocess.DEVNULL).check_returncode()
         except:
             subprocess.run(run_command + ['handles-persistent'], stdout=outfile).check_returncode()
 
@@ -150,7 +200,7 @@ def keygen(args):
     if args.docker:
         run_command = [ 'docker', 'run', '-it', '--init', '--device=' + device,
                 '--volume=' + os.path.join(os.getcwd(), detail_dir) + ':/tpm2-algtest/build/out:z',
-                'simonstruk/tpm2-algtest:' + image_tag ]
+                'simonstruk/tpm2-algtest:' + IMAGE_TAG ]
     else:
         run_command = [ 'sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir ]
     run_command += ['-T', 'device', '-s', 'keygen' ]
@@ -170,7 +220,7 @@ def perf(args):
     if args.docker:
         run_command = [ 'docker', 'run', '-it', '--init', '--device=' + device,
                 '--volume=' + os.path.join(os.getcwd(), detail_dir) + ':/tpm2-algtest/build/out:z',
-                'simonstruk/tpm2-algtest:' + image_tag ]
+                'simonstruk/tpm2-algtest:' + IMAGE_TAG ]
     else:
         run_command = [ 'sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir ]
     run_command += ['-T', 'device', '-s', 'perf' ]
@@ -252,7 +302,7 @@ def cryptoops(args):
     if args.docker:
         run_command = [ 'docker', 'run', '-it', '--init', '--device=' + device,
                 '--volume=' + os.path.join(os.getcwd(), detail_dir) + ':/tpm2-algtest/build/out:z',
-                'simonstruk/tpm2-algtest:' + image_tag ]
+                'simonstruk/tpm2-algtest:' + IMAGE_TAG ]
     else:
         run_command = [ 'sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir ]
     run_command += ['-T', 'device', '-s', 'cryptoops' ]
@@ -278,7 +328,7 @@ def rng(args):
     if args.docker:
         run_command = [ 'docker', 'run', '-it', '--init', '--device=' + device,
                 '--volume=' + os.path.join(os.getcwd(), detail_dir) + ':/tpm2-algtest/build/out:z',
-                'simonstruk/tpm2-algtest:' + image_tag ]
+                'simonstruk/tpm2-algtest:' + IMAGE_TAG ]
     else:
         run_command = [ 'sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir ]
     run_command += ['-T', 'device', '-s', 'rng' ]
@@ -322,13 +372,25 @@ def get_tpm_id(detail_dir):
     vendor_str = vendor_str.replace('\0', '')
     return manufacturer, vendor_str, fw
 
-def write_header(file, manufacturer, vendor_str, fw):
-    file.write('Tested and provided by;\n')
-    file.write(f'Execution date/time; {datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")}\n')
-    file.write(f'Manufacturer; {manufacturer}\n')
-    file.write(f'Vendor string; {vendor_str}\n')
-    file.write(f'Firmware version; {fw}\n')
-    file.write(f'Image tag; {image_tag}\n\n')
+
+def write_header(file, detail_dir):
+    manufacturer, vendor_str, fw = get_tpm_id(detail_dir)
+    file.write(f'Execution date/time;{datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")}\n')
+    file.write(f'Manufacturer;{manufacturer}\n')
+    file.write(f'Vendor string;{vendor_str}\n')
+    file.write(f'Firmware version;{fw}\n')
+    file.write(f'Image tag;{IMAGE_TAG}\n')
+    file.write(f'TPM devices;{";".join(glob.glob("/dev/tpm*"))}\n')
+    try:
+        system_manufacturer, product_name, system_version, bios_version, uname = get_system_id(detail_dir)
+        file.write(f'Device manufacturer;{system_manufacturer}\n')
+        file.write(f'Device name;{product_name}\n')
+        file.write(f'Device version;{system_version}\n')
+        file.write(f'BIOS version;{bios_version}\n')
+        file.write(f'System information;{uname}\n')
+    except:
+        pass
+    file.write('\n')
 
 def compute_stats(infile, *, rsa2048=False):
     ignore = 5 if rsa2048 else 0
@@ -442,12 +504,12 @@ def create_result_files(outdir):
 
     os.makedirs(os.path.join(outdir, 'results'), exist_ok=True)
     with open(os.path.join(outdir, 'results', file_name), 'w') as support_file:
-        write_header(support_file, manufacturer, vendor_str, fw)
+        write_header(support_file, detail_dir)
         write_support_file(support_file, detail_dir)
 
     os.makedirs(os.path.join(outdir, 'performance'), exist_ok=True)
     with open(os.path.join(outdir, 'performance', file_name), 'w') as perf_file:
-        write_header(perf_file, manufacturer, vendor_str, fw)
+        write_header(perf_file, detail_dir)
         write_perf_file(perf_file, detail_dir)
 
 def main():
@@ -491,14 +553,26 @@ def main():
         rng(args)
         zip(args.outdir)
     elif args.test == 'fulltest':
+        print("Running fulltest – all tests will be run")
         os.makedirs(detail_dir, exist_ok=True)
         with open(os.path.join(detail_dir, 'image_tag.txt'), 'w') as f:
-            f.write(image_tag)
+            f.write(IMAGE_TAG)
         quicktest(args, detail_dir)
-        keygen(args)
+        default_num = args.num is None
+        if default_num:
+            args.num = 1000
         cryptoops(args)
+        if default_num:
+            args.num = 4000
         rng(args)
+        if default_num:
+            args.num = 1000
         perf(args)
+        if default_num:
+            args.num = 1000
+        keygen(args)
+        if default_num:
+            args.num = None
         create_result_files(args.outdir)
         zip(args.outdir)
         print('The tests are finished. Thank you! Please send us the generated file (' + args.outdir + '.zip).')
