@@ -30,19 +30,20 @@ def get_system_id(detail_dir):
         with open(system_info, 'r') as dmidecode_file:
             output = dmidecode_file.read().replace("\t", "").split("\n")
             try:
-                manufacturer = output[1].split(":")[1][1:]
+                manufacturer = output[0].split(":")[1][1:]
             except:
                 pass
 
             try:
-                product_name = output[2].split(":")[1][1:]
+                product_name = output[1].split(":")[1][1:]
             except:
                 pass
 
             try:
-                version = output[3].split(":")[1][1:]
+                version = output[2].split(":")[1][1:]
             except:
                 pass
+
     system_info = os.path.join(detail_dir, 'dmidecode_bios_version.txt')
     if os.path.isfile(system_info):
         with open(system_info, 'r') as dmidecode_bios_file:
@@ -65,13 +66,13 @@ def quicktest(args, detail_dir):
     print('Running quicktest...')
 
     try:
-        result = subprocess.run("sudo -n dmidecode -s bios-version", stderr=subprocess.STDOUT, stdout=subprocess.PIPE, shell=True)
+        result = subprocess.run("sudo -n dmidecode -s bios-version", stdout=subprocess.PIPE, shell=True)
         with open(os.path.join(detail_dir, 'dmidecode_bios_version.txt'), 'w') as outfile:
             outfile.write(result.stdout.decode("ascii"))
-        result = subprocess.run("sudo -n dmidecode | grep -A3 '^System Information'", stderr=subprocess.STDOUT, stdout=subprocess.PIPE, shell=True)
+        result = subprocess.run("sudo dmidecode -t system | grep -Ei '^\s*(manufacturer|product name|version):'", stdout=subprocess.PIPE, shell=True)
         with open(os.path.join(detail_dir, 'dmidecode_system_info.txt'), 'w') as outfile:
             outfile.write(result.stdout.decode("ascii"))
-        result = subprocess.run("uname -a", stderr=subprocess.STDOUT, stdout=subprocess.PIPE, shell=True)
+        result = subprocess.run("uname -a", stdout=subprocess.PIPE, shell=True)
         with open(os.path.join(detail_dir, 'uname_system_info.txt'), 'w') as outfile:
             outfile.write(result.stdout.decode("ascii"))
     except:
@@ -81,25 +82,25 @@ def quicktest(args, detail_dir):
         try:
             subprocess.run(run_command + ['-c', 'algorithms'], stdout=outfile, stderr=subprocess.DEVNULL).check_returncode()
         except:
-            subprocess.run(run_command + ['algorithms'], stdout=outfile, stderr=subprocess.STDOUT).check_returncode()
+            subprocess.run(run_command + ['algorithms'], stdout=outfile).check_returncode()
 
     with open(os.path.join(detail_dir, 'Quicktest_commands.txt'), 'w') as outfile:
         try:
             subprocess.run(run_command + ['-c', 'commands'], stdout=outfile, stderr=subprocess.DEVNULL).check_returncode()
         except:
-            subprocess.run(run_command + ['commands'], stdout=outfile, stderr=subprocess.STDOUT).check_returncode()
+            subprocess.run(run_command + ['commands'], stdout=outfile).check_returncode()
 
     with open(os.path.join(detail_dir, 'Quicktest_properties-fixed.txt'), 'w') as outfile:
         try:
             subprocess.run(run_command + ['-c', 'properties-fixed'], stdout=outfile, stderr=subprocess.DEVNULL).check_returncode()
         except:
-            subprocess.run(run_command + ['properties-fixed'], stdout=outfile, stderr=subprocess.STDOUT).check_returncode()
+            subprocess.run(run_command + ['properties-fixed'], stdout=outfile).check_returncode()
 
     with open(os.path.join(detail_dir, 'Quicktest_properties-variable.txt'), 'w') as outfile:
         try:
             subprocess.run(run_command + ['-c', 'properties-variable'], stdout=outfile, stderr=subprocess.DEVNULL).check_returncode()
         except:
-            subprocess.run(run_command + ['properties-variable'], stdout=outfile, stderr=subprocess.STDOUT).check_returncode()
+            subprocess.run(run_command + ['properties-variable'], stdout=outfile).check_returncode()
 
     with open(os.path.join(detail_dir, 'Quicktest_ecc-curves.txt'), 'w') as outfile:
         try:
