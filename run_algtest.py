@@ -188,10 +188,14 @@ def get_tpm_id(detail_dir):
     if os.path.isfile(properties_path):
         with open(properties_path, 'r') as properties_file:
             lines = properties_file.readlines()
+
             fw1 = ''
             fw2 = ''
             for idx, line in enumerate(lines):
-                val = get_val(lines[idx]) or get_val(lines[idx + 1])
+                val = get_val(lines[idx])
+                if idx + 1 < len(lines):
+                    val = val or get_val(lines[idx + 1])
+
                 if line.startswith('TPM2_PT_MANUFACTURER'):
                     manufacturer = bytearray.fromhex(val).decode()
                 elif line.startswith('TPM2_PT_FIRMWARE_VERSION_1'):
@@ -200,6 +204,7 @@ def get_tpm_id(detail_dir):
                     fw2 = val
                 elif line.startswith('TPM2_PT_VENDOR_STRING_'):
                     vendor_str += bytearray.fromhex(val).decode()
+
             fw = str(int(fw1[0:4], 16)) + '.' + str(int(fw1[4:8], 16)) + '.' + str(int(fw2[0:4], 16)) + '.' + str(int(fw2[4:8], 16))
 
     manufacturer = manufacturer.replace('\0', '')
