@@ -147,7 +147,6 @@ bool run_ecc_sign(
     if(scenario->sign.scheme.scheme == TPM2_ALG_ECDAA) {
         inPublic.publicArea.parameters.eccDetail.scheme.scheme = TPM2_ALG_ECDAA;
         inPublic.publicArea.parameters.eccDetail.scheme.details.ecdaa.hashAlg = TPM2_ALG_SHA256;
-        inPublic.publicArea.parameters.eccDetail.scheme.details.ecdaa.count = 0; // Most likely can be removed without any side effects.
     }
 
     if(!scenario->sign.no_export) {
@@ -176,6 +175,7 @@ bool run_ecc_sign(
         return false;
     }
 
+    int failures = 0;
     result->size = 0;
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
@@ -248,6 +248,8 @@ bool run_ecc_sign(
                 result->data_points[i].ecc.public_key_y_size = keypair.public_key.ecc.y.size;
                 memcpy(&result->data_points[i].ecc.public_key_y, keypair.public_key.ecc.y.buffer, keypair.public_key.ecc.y.size);
             }
+        } else {
+            ++failures;
         }
         ++result->size;
         log_info("Cryptoops ecc %d: | scheme %04x | curve %04x | duration %f | duration extra %f | rc %04x",
@@ -255,7 +257,14 @@ bool run_ecc_sign(
                 scenario->sign.key_params.parameters.eccDetail.curveID,
                 result->data_points[i].duration_s, result->data_points[i].duration_extra_s, result->data_points[i].rc);
 
-	    printf("%lu%%\n", inc_and_get_progress_percentage(prog));
+	    printf("%lu%%\n", increase_progress(prog));
+
+	    if(failures >= FAILURE_LIMIT) {
+	        log_error("Cryptoops ecc: Too many failures. Skipping remaining iterations.");
+	        skip_progress(prog, scenario->parameters.repetitions - i);
+            Tss2_Sys_FlushContext(sapi_context, object_handle);
+            return false;
+	    }
     }
 
     Tss2_Sys_FlushContext(sapi_context, object_handle);
@@ -314,6 +323,7 @@ bool run_rsa_sign(
         return false;
     }
 
+    int failures = 0;
     result->size = 0;
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
@@ -366,13 +376,22 @@ bool run_rsa_sign(
                 result->data_points[i].rsa.public_key_size = keypair.public_key.rsa.size;
                 memcpy(&result->data_points[i].rsa.public_key, keypair.public_key.rsa.buffer, keypair.public_key.rsa.size);
             }
+        } else {
+            ++failures;
         }
         ++result->size;
         log_info("Cryptoops rsa %d: scheme %04x | duration %f | rc %04x",
                  i, scenario->sign.scheme.scheme,
                  result->data_points[i].duration_s, result->data_points[i].rc);
 
-        printf("%lu%%\n", inc_and_get_progress_percentage(prog));
+        printf("%lu%%\n", increase_progress(prog));
+
+        if(failures >= FAILURE_LIMIT) {
+            log_error("Cryptoops rsa: Too many failures. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i);
+            Tss2_Sys_FlushContext(sapi_context, object_handle);
+            return false;
+        }
     }
 
     Tss2_Sys_FlushContext(sapi_context, object_handle);
