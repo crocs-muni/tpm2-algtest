@@ -173,35 +173,35 @@ void output_results(
 
     switch (scenario->key_params.type) {
     case TPM2_ALG_RSA:
-        out = open_csv(filename_keys, "id;n;e;p;q;d;t");
+        out = open_csv(filename_keys, "id,n,e,p,q,d,t");
         for (int i = 0; i < result->size; ++i) {
-            fprintf(out, "%d;", i);
+            fprintf(out, "%d,", i);
             for (int j = 0; j < result->keypairs[i].public_key.rsa.size; ++j) {
                 fprintf(out, "%02X", result->keypairs[i].public_key.rsa.buffer[j]);
             }
-            fprintf(out, ";010001;");
+            fprintf(out, ",010001,");
             for (int j = 0; j < result->keypairs[i].private_key.rsa.size; ++j) {
                 fprintf(out, "%02X", result->keypairs[i].private_key.rsa.buffer[j]);
             }
-            fprintf(out, "; ; ;%d\n", (int) (result->data_points[i].duration_s * 1000));
+            fprintf(out, ",,,%d\n", (int) (result->data_points[i].duration_s * 1000));
         }
         break;
     case TPM2_ALG_ECC:
-        out = open_csv(filename_keys, "id;x;y;private;t");
+        out = open_csv(filename_keys, "id,x,y,private,t");
         for (int i = 0; i < result->size; ++i) {
-            fprintf(out, "%d;", i);
+            fprintf(out, "%d,", i);
             for (int j = 0; j < result->keypairs[i].public_key.ecc.x.size; ++j) {
                 fprintf(out, "%02X", result->keypairs[i].public_key.ecc.x.buffer[j]);
             }
-            fprintf(out, ";");
+            fprintf(out, ",");
             for (int j = 0; j < result->keypairs[i].public_key.ecc.y.size; ++j) {
                 fprintf(out, "%02X", result->keypairs[i].public_key.ecc.y.buffer[j]);
             }
-            fprintf(out, ";");
+            fprintf(out, ",");
             for (int j = 0; j < result->keypairs[i].private_key.ecc.size; ++j) {
                 fprintf(out, "%02X", result->keypairs[i].private_key.ecc.buffer[j]);
             }
-            fprintf(out, ";%d\n", (int) (result->data_points[i].duration_s * 1000));
+            fprintf(out, ",%d\n", (int) (result->data_points[i].duration_s * 1000));
         }
         break;
     case TPM2_ALG_KEYEDHASH:
