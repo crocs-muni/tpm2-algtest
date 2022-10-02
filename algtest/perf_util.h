@@ -1,5 +1,6 @@
 #pragma once
 #include <tss2/tss2_sys.h>
+#include <stdbool.h>
 
 TPM2_RC sign(
         TSS2_SYS_CONTEXT *sapi_context,
@@ -44,7 +45,8 @@ TPM2_RC encryptdecrypt(
         TPMI_YES_NO decrypt,
         const TPM2B_IV *inIv,
         const TPM2B_MAX_BUFFER *inData,
-        double *duration);
+        double *duration,
+        bool deprecated);
 
 TPM2_RC hmac(
         TSS2_SYS_CONTEXT *sapi_context,
