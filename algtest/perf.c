@@ -201,6 +201,10 @@ bool run_perf_verifysignature(
         struct progress *prog)
 {
     TPM2B_PUBLIC inPublic = prepare_template(&scenario->verifysignature.key_params);
+    if(scenario->sign.scheme.scheme == TPM2_ALG_ECDAA) {
+        inPublic.publicArea.parameters.eccDetail.scheme.scheme = TPM2_ALG_ECDAA;
+        inPublic.publicArea.parameters.eccDetail.scheme.details.ecdaa.hashAlg = TPM2_ALG_SHA256;
+    }
 
     TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
     if (rc != TPM2_RC_SUCCESS) {
@@ -220,7 +224,13 @@ bool run_perf_verifysignature(
             &scenario->verifysignature.digest, &signature, NULL, NULL, NULL);
 
     if (rc != TPM2_RC_SUCCESS) {
-        log_error("Perf verifysignature: Could not create signature %04x", rc);
+        if (scenario->verifysignature.key_params.type == TPM2_ALG_RSA) {
+            log_info("Perf verifysignature: Could not create signature RSA | keybits %d | scheme %04x | rc %04x", scenario->verifysignature.key_params.parameters.rsaDetail.keyBits, scenario->verifysignature.scheme.scheme, rc);
+        } else if (scenario->verifysignature.key_params.type == TPM2_ALG_ECC) {
+            log_info("Perf verifysignature: Could not create signature ECC | curve %04x | scheme %04x | rc %04x", scenario->verifysignature.key_params.parameters.eccDetail.curveID, scenario->verifysignature.scheme.scheme, rc);
+        } else {
+            log_error("Perf verifysignature: Could not create signature type %04x | scheme %04x | rc %04x", scenario->verifysignature.key_params.type, scenario->verifysignature.scheme.scheme, rc);
+        }
         Tss2_Sys_FlushContext(sapi_context, object_handle);
         return false;
     }
@@ -588,7 +598,7 @@ bool run_perf_zgen(
         result->data_points[i].rc = ec_ephemeral(sapi_context, scenario->zgen.key_params.parameters.eccDetail.curveID,
                                                  &point, &counter, &result->data_points[i].duration_extra_s);
 
-        log_info("Perf zgen p1 %d: curve %04x | duration %f | rc %04x",
+        log_info("Perf zgen (phase 1) %d: curve %04x | duration %f | rc %04x",
                  i, scenario->zgen.key_params.parameters.eccDetail.curveID,
                  result->data_points[i].duration_extra_s, result->data_points[i].rc);
         if (result->data_points[i].rc == TPM2_RC_SUCCESS) {
@@ -596,7 +606,7 @@ bool run_perf_zgen(
             TPM2B_ECC_POINT outZ1 = { .size = 0 };
             TPM2B_ECC_POINT outZ2 = { .size = 0 };
             result->data_points[i].rc = zgen_2phase(sapi_context, object_handle, &point, &point, scenario->zgen.scheme, counter, &outZ1, &outZ2, &result->data_points[i].duration_s);
-            log_info("Perf zgen p2 %d: curve %04x | scheme %04x | duration %f | rc %04x",
+            log_info("Perf zgen (phase 2) %d: curve %04x | scheme %04x | duration %f | rc %04x",
                      i, scenario->zgen.key_params.parameters.eccDetail.curveID, scenario->zgen.scheme,
                      result->data_points[i].duration_s, result->data_points[i].rc);
 
