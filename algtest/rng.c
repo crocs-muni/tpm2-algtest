@@ -9,47 +9,18 @@
 #include <time.h>
 
 static
-bool alloc_result(
+void output_result(
         const struct rng_scenario *scenario,
-        struct rng_result *result)
+        const uint8_t *result)
 {
-    result->data_points = calloc(scenario->parameters.repetitions, sizeof(struct rng_data_point));
-    return result->data_points != NULL;
-}
-
-static
-void free_result(struct rng_result *result)
-{
-    free(result->data_points);
-}
-
-static
-void output_results(
-        const struct rng_scenario *scenario,
-        const struct rng_result *result)
-{
-    char filename[256];
-    switch (scenario->command_code) {
-    case TPM2_CC_GetRandom:
-        snprintf(filename, 256, "Rng:%d.csv", scenario->bytes_number);
-        break;
-    default:
-        log_error("Rng: (output_results) Command not supported.");
+    FILE *out = open_bin("Rng.bin");
+    if(!out) {
+        log_error("Rng: cannot open output file.");
         return;
     }
-
-    FILE *out = open_csv(filename, "bytes_number,data,duration,return_code");
-    for (int i = 0; i < result->size; ++i) {
-        struct rng_data_point *dp = &result->data_points[i];
-        fprintf(out, "%d,", dp->bytes_number);
-        for(uint16_t j = 0; j < dp->bytes_number; ++j) {
-            fprintf(out, "%02x", dp->data[j]);
-        }
-        fprintf(out, ",%f,%04x\n", dp->duration_s, dp->rc);
-    }
+    fwrite(result, scenario->bytes_number, scenario->parameters.repetitions, out);
     fclose(out);
 }
-
 
 TPM2_RC getrandom_bytes(
         TSS2_SYS_CONTEXT *sapi_context,
@@ -72,57 +43,57 @@ TPM2_RC getrandom_bytes(
     return rc;
 }
 
-
 void run_rng_getrandom(
         TSS2_SYS_CONTEXT *sapi_context,
         const struct rng_scenario *scenario,
         struct progress *prog)
 {
-    struct rng_result result;
-    if (!alloc_result(scenario, &result)) {
+    uint8_t* result = (uint8_t*) calloc(scenario->bytes_number, scenario->parameters.repetitions);
+    if (!result) {
         log_error("Rng: cannot allocate memory for result.");
         return;
     }
     int failures = 0;
-    result.size = 0;
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
-
     for (unsigned i = 0; i < scenario->parameters.repetitions; ++i) {
         clock_gettime(CLOCK_MONOTONIC, &end);
         if (get_duration_s(&start, &end) > scenario->parameters.max_duration_s) {
             break;
         }
 
+        double duration;
         TPM2B_DIGEST buffer = { .size = 0 };
-        result.data_points[i].rc = getrandom_bytes(sapi_context, &buffer, scenario->bytes_number, &result.data_points[i].duration_s);
-        result.data_points[i].bytes_number = buffer.size;
-        memcpy(result.data_points[i].data, buffer.buffer, buffer.size);
+        TPM2_RC rc = getrandom_bytes(sapi_context, &buffer, scenario->bytes_number, &duration);
 
-        if(result.data_points[i].rc != TPM2_RC_SUCCESS) {
+        if (rc == TPM2_RC_SUCCESS) {
+            if (buffer.size != scenario->bytes_number) {
+                log_error("Rng: requested %d B | received %d B", scenario->bytes_number, buffer.size);
+            }
+            memcpy(result + i * scenario->bytes_number, buffer.buffer, buffer.size);
+        } else {
             ++failures;
         }
-        ++result.size;
-        log_info("Rng %d: duration %f | rc %04x",
-                 i, result.data_points[i].duration_s, result.data_points[i].rc);
+
+        log_info("Rng %d: duration %f | rc %04x", i, duration, rc);
         printf("%lu%%\n", increase_progress(prog));
 
         if(failures >= FAILURE_LIMIT) {
             log_error("Rng: Too many failures. Skipping remaining iterations.");
             skip_progress(prog, scenario->parameters.repetitions - i - 1);
-            free_result(&result);
+            free(result);
             return;
         }
     }
 
-    output_results(scenario, &result);
-    free_result(&result);
+    output_result(scenario, result);
+    free(result);
 }
 
 unsigned long count_supported_rng_scenarios(const struct scenario_parameters *parameters)
 {
     if (command_in_options("getrandom")) {
-        return parameters->repetitions * 2;
+        return parameters->repetitions;
     }
     return 0;
 }
@@ -152,8 +123,6 @@ void run_rng_scenarios(
     if (command_in_options("getrandom")) {
         scenario.command_code = TPM2_CC_GetRandom;
         scenario.bytes_number = 32;
-        run_rng_getrandom(sapi_context, &scenario, &prog);
-        scenario.bytes_number = 64;
         run_rng_getrandom(sapi_context, &scenario, &prog);
     }
 
