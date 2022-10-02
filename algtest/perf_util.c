@@ -200,7 +200,8 @@ TPM2_RC encryptdecrypt(
         TPMI_YES_NO decrypt,
         const TPM2B_IV *inIv,
         const TPM2B_MAX_BUFFER *inData,
-        double *duration)
+        double *duration,
+        bool deprecated)
 {
     /* Cmd parameters */
     TSS2L_SYS_AUTH_COMMAND cmdAuthsArray = prepare_session();
@@ -213,8 +214,9 @@ TPM2_RC encryptdecrypt(
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
 
-    TPM2_RC rc = Tss2_Sys_EncryptDecrypt(sapi_context, keyHandle, &cmdAuthsArray,
-            decrypt, TPM2_ALG_NULL, inIv, inData, &outData, &outIv, &rspAuthsArray);
+    TPM2_RC rc = deprecated ?
+        Tss2_Sys_EncryptDecrypt(sapi_context, keyHandle, &cmdAuthsArray, decrypt, TPM2_ALG_NULL, inIv, inData, &outData, &outIv, &rspAuthsArray) :
+        Tss2_Sys_EncryptDecrypt2(sapi_context, keyHandle, &cmdAuthsArray, inData, decrypt, TPM2_ALG_NULL, inIv, &outData, &outIv, &rspAuthsArray);
 
     clock_gettime(CLOCK_MONOTONIC, &end);
     if (duration != NULL) {

@@ -431,6 +431,11 @@ bool run_perf_encryptdecrypt(
     TPM2B_MAX_BUFFER inData = { .size = 256 };
     memset(&inData.buffer, 0x00, inData.size);
 
+    // Use deprecated command variant in case the new version is not supported (TPM2 older than 2016)
+    bool deprecated = encryptdecrypt(sapi_context, object_handle,
+                                     scenario->encryptdecrypt.decrypt, &inIv, &inData,
+                                     NULL, false) == TPM2_RC_COMMAND_CODE;
+
     int failures = 0;
     result->size = 0;
     struct timespec start, end;
@@ -444,18 +449,19 @@ bool run_perf_encryptdecrypt(
 
         result->data_points[i].rc = encryptdecrypt(sapi_context, object_handle,
                 scenario->encryptdecrypt.decrypt, &inIv, &inData,
-                &result->data_points[i].duration_s);
+                &result->data_points[i].duration_s, deprecated);
 
         if (result->data_points[i].rc != TPM2_RC_SUCCESS) {
             ++failures;
         }
         ++result->size;
 
-        log_info("Perf encryptdecrypt %d: algorithm %04x | keybits %d | mode %04x | %s | duration %f | rc %04x",
+        log_info("Perf encryptdecrypt %d: algorithm %04x | keybits %d | mode %04x | %s | deprecated %s | duration %f | rc %04x",
                 i, scenario->encryptdecrypt.sym.algorithm,
                 scenario->encryptdecrypt.sym.keyBits,
                 scenario->encryptdecrypt.sym.mode,
                 scenario->encryptdecrypt.decrypt ? "decrypt" : "encrypt",
+                deprecated ? "true" : "false",
                 result->data_points[i].duration_s, result->data_points[i].rc);
         printf("%lu%%\n", increase_progress(prog));
 
