@@ -175,6 +175,11 @@ bool run_ecc_sign(
         return false;
     }
 
+    struct exported_keypair keypair;
+    if (!scenario->sign.no_export) {
+        export_keypair(sapi_context, primary_handle, &outPublic, &outPrivate, &keypair);
+    }
+
     int failures = 0;
     result->size = 0;
     struct timespec start, end;
@@ -236,9 +241,6 @@ bool run_ecc_sign(
             }
 
             if (!scenario->sign.no_export) {
-                struct exported_keypair keypair;
-                export_keypair(sapi_context, primary_handle, &outPublic, &outPrivate, &keypair);
-
                 result->data_points[i].ecc.private_key_size = keypair.private_key.ecc.size;
                 memcpy(&result->data_points[i].ecc.private_key, keypair.private_key.ecc.buffer, keypair.private_key.ecc.size);
 
@@ -323,6 +325,12 @@ bool run_rsa_sign(
         return false;
     }
 
+    struct exported_keypair keypair;
+    if (!scenario->sign.no_export) {
+        export_keypair(sapi_context, primary_handle, &outPublic, &outPrivate, &keypair);
+    }
+
+
     int failures = 0;
     result->size = 0;
     struct timespec start, end;
@@ -367,9 +375,6 @@ bool run_rsa_sign(
             }
 
             if (!scenario->sign.no_export) {
-                struct exported_keypair keypair;
-                export_keypair(sapi_context, primary_handle, &outPublic, &outPrivate, &keypair);
-
                 result->data_points[i].rsa.private_key_size = keypair.private_key.rsa.size;
                 memcpy(&result->data_points[i].rsa.private_key, keypair.private_key.rsa.buffer, keypair.private_key.rsa.size);
 
