@@ -145,6 +145,8 @@ bool run_perf_sign(
         log_error("Perf sign: Error when creating signing key %04x", rc);
         return false;
     }
+
+    int failures = 0;
     result->size = 0;
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
@@ -160,6 +162,9 @@ bool run_perf_sign(
                 &scenario->sign.scheme, &scenario->sign.digest, &signature, NULL,
                 &result->data_points[i].duration_s, &result->data_points[i].duration_extra_s);
 
+        if (result->data_points[i].rc != TPM2_RC_SUCCESS) {
+            ++failures;
+        }
         ++result->size;
         switch (scenario->sign.key_params.type) {
         case TPM2_ALG_RSA:
@@ -175,7 +180,13 @@ bool run_perf_sign(
                     result->data_points[i].duration_s, result->data_points[i].rc);
         }
 
-	printf("%lu%%\n", inc_and_get_progress_percentage(prog));
+	    printf("%lu%%\n", increase_progress(prog));
+        if(failures >= FAILURE_LIMIT) {
+            log_error("Perf sign: Too many failures. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i);
+            Tss2_Sys_FlushContext(sapi_context, object_handle);
+            return false;
+        }
     }
 
     Tss2_Sys_FlushContext(sapi_context, object_handle);
@@ -214,6 +225,7 @@ bool run_perf_verifysignature(
         return false;
     }
 
+    int failures = 0;
     result->size = 0;
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
@@ -228,6 +240,9 @@ bool run_perf_verifysignature(
                 &scenario->verifysignature.digest, &signature,
                 &result->data_points[i].duration_s);
 
+        if (result->data_points[i].rc != TPM2_RC_SUCCESS) {
+            ++failures;
+        }
         ++result->size;
         switch (scenario->verifysignature.key_params.type) {
         case TPM2_ALG_RSA:
@@ -243,7 +258,13 @@ bool run_perf_verifysignature(
                     result->data_points[i].duration_s, result->data_points[i].rc);
         }
 
-	printf("%lu%%\n", inc_and_get_progress_percentage(prog));
+        printf("%lu%%\n", increase_progress(prog));
+        if(failures >= FAILURE_LIMIT) {
+            log_error("Perf verifysignature: Too many failures. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i);
+            Tss2_Sys_FlushContext(sapi_context, object_handle);
+            return false;
+        }
     }
     Tss2_Sys_FlushContext(sapi_context, object_handle);
     return true;
@@ -270,6 +291,7 @@ bool run_perf_rsa_encrypt(
         return false;
     }
 
+    int failures = 0;
     result->size = 0;
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
@@ -284,12 +306,23 @@ bool run_perf_rsa_encrypt(
         result->data_points[i].rc = rsa_encrypt(sapi_context, object_handle,
                 &scenario->rsa_encrypt.message, &scenario->rsa_encrypt.scheme,
                 &outData, &result->data_points[i].duration_s);
+
+        if (result->data_points[i].rc != TPM2_RC_SUCCESS) {
+            ++failures;
+        }
         ++result->size;
         log_info("Perf rsa_encrypt: %d: scheme: %04x | keybits %d | duration %f | rc %04x",
                 i, scenario->rsa_encrypt.scheme.scheme,
                 scenario->rsa_encrypt.keylen, result->data_points[i].duration_s,
                 result->data_points[i].rc);
-	printf("%lu%%\n", inc_and_get_progress_percentage(prog));
+
+        printf("%lu%%\n", increase_progress(prog));
+        if(failures >= FAILURE_LIMIT) {
+            log_error("Perf rsa_encrypt: Too many failures. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i);
+            Tss2_Sys_FlushContext(sapi_context, object_handle);
+            return false;
+        }
     }
     Tss2_Sys_FlushContext(sapi_context, object_handle);
     return true;
@@ -320,6 +353,7 @@ bool run_perf_rsa_decrypt(
     rsa_encrypt(sapi_context, object_handle, &scenario->rsa_decrypt.message,
             &scenario->rsa_decrypt.scheme, &ciphertext, NULL);
 
+    int failures;
     result->size = 0;
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
@@ -334,12 +368,23 @@ bool run_perf_rsa_decrypt(
         result->data_points[i].rc = rsa_decrypt(sapi_context, object_handle,
                 &ciphertext, &scenario->rsa_decrypt.scheme, &decrypted_message,
                 &result->data_points[i].duration_s);
+
+        if (result->data_points[i].rc != TPM2_RC_SUCCESS) {
+            ++failures;
+        }
         ++result->size;
         log_info("Perf rsa_decrypt: %d: scheme %04x | keybits %d | duration %f | rc %04x",
                 i, scenario->rsa_decrypt.scheme.scheme,
                 scenario->rsa_decrypt.keylen, result->data_points[i].duration_s,
                 result->data_points[i].rc);
-	printf("%lu%%\n", inc_and_get_progress_percentage(prog));
+	    printf("%lu%%\n", increase_progress(prog));
+
+        if(failures >= FAILURE_LIMIT) {
+            log_error("Perf rsa_decrypt: Too many failures. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i);
+            Tss2_Sys_FlushContext(sapi_context, object_handle);
+            return false;
+        }
     }
     Tss2_Sys_FlushContext(sapi_context, object_handle);
     return true;
@@ -386,6 +431,7 @@ bool run_perf_encryptdecrypt(
     TPM2B_MAX_BUFFER inData = { .size = 256 };
     memset(&inData.buffer, 0x00, inData.size);
 
+    int failures = 0;
     result->size = 0;
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
@@ -399,6 +445,10 @@ bool run_perf_encryptdecrypt(
         result->data_points[i].rc = encryptdecrypt(sapi_context, object_handle,
                 scenario->encryptdecrypt.decrypt, &inIv, &inData,
                 &result->data_points[i].duration_s);
+
+        if (result->data_points[i].rc != TPM2_RC_SUCCESS) {
+            ++failures;
+        }
         ++result->size;
 
         log_info("Perf encryptdecrypt %d: algorithm %04x | keybits %d | mode %04x | %s | duration %f | rc %04x",
@@ -407,7 +457,14 @@ bool run_perf_encryptdecrypt(
                 scenario->encryptdecrypt.sym.mode,
                 scenario->encryptdecrypt.decrypt ? "decrypt" : "encrypt",
                 result->data_points[i].duration_s, result->data_points[i].rc);
-	printf("%lu%%\n", inc_and_get_progress_percentage(prog));
+        printf("%lu%%\n", increase_progress(prog));
+
+        if(failures >= FAILURE_LIMIT) {
+            log_error("Perf encryptdecrypt: Too many failures. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i);
+            Tss2_Sys_FlushContext(sapi_context, object_handle);
+            return false;
+        }
     }
     Tss2_Sys_FlushContext(sapi_context, object_handle);
     return true;
@@ -446,6 +503,7 @@ bool run_perf_hmac(
         return false;
     }
 
+    int failures = 0;
     result->size = 0;
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
@@ -461,11 +519,22 @@ bool run_perf_hmac(
 
         result->data_points[i].rc = hmac(sapi_context, object_handle, &buffer,
                 TPM2_ALG_NULL, &result->data_points[i].duration_s);
+
+        if (result->data_points[i].rc != TPM2_RC_SUCCESS) {
+            ++failures;
+        }
         ++result->size;
 
         log_info("Perf hmac %d: duration %f | rc %04x",
                 i, result->data_points[i].duration_s, result->data_points[i].rc);
-	printf("%lu%%\n", inc_and_get_progress_percentage(prog));
+
+        printf("%lu%%\n", increase_progress(prog));
+        if(failures >= FAILURE_LIMIT) {
+            log_error("Perf hmac: Too many failures. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i);
+            Tss2_Sys_FlushContext(sapi_context, object_handle);
+            return false;
+        }
     }
 
     Tss2_Sys_FlushContext(sapi_context, object_handle);
@@ -496,6 +565,8 @@ bool run_perf_zgen(
         Tss2_Sys_FlushContext(sapi_context, object_handle);
         return false;
     }
+
+    int failures = 0;
     result->size = 0;
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
@@ -514,18 +585,31 @@ bool run_perf_zgen(
         log_info("Perf zgen p1 %d: curve %04x | duration %f | rc %04x",
                  i, scenario->zgen.key_params.parameters.eccDetail.curveID,
                  result->data_points[i].duration_extra_s, result->data_points[i].rc);
+        if (result->data_points[i].rc == TPM2_RC_SUCCESS) {
 
+            TPM2B_ECC_POINT outZ1 = { .size = 0 };
+            TPM2B_ECC_POINT outZ2 = { .size = 0 };
+            result->data_points[i].rc = zgen_2phase(sapi_context, object_handle, &point, &point, scenario->zgen.scheme, counter, &outZ1, &outZ2, &result->data_points[i].duration_s);
+            log_info("Perf zgen p2 %d: curve %04x | scheme %04x | duration %f | rc %04x",
+                     i, scenario->zgen.key_params.parameters.eccDetail.curveID, scenario->zgen.scheme,
+                     result->data_points[i].duration_s, result->data_points[i].rc);
 
-        TPM2B_ECC_POINT outZ1 = { .size = 0 };
-        TPM2B_ECC_POINT outZ2 = { .size = 0 };
-        result->data_points[i].rc = zgen_2phase(sapi_context, object_handle, &point, &point, scenario->zgen.scheme, counter, &outZ1, &outZ2, &result->data_points[i].duration_s);
-        log_info("Perf zgen p2 %d: curve %04x | scheme %04x | duration %f | rc %04x",
-                 i, scenario->zgen.key_params.parameters.eccDetail.curveID, scenario->zgen.scheme,
-                 result->data_points[i].duration_s, result->data_points[i].rc);
+            if (result->data_points[i].rc != TPM2_RC_SUCCESS) {
+                ++failures;
+            }
+        } else {
+            ++failures;
+        }
 
         ++result->size;
 
-        printf("%lu%%\n", inc_and_get_progress_percentage(prog));
+        printf("%lu%%\n", increase_progress(prog));
+        if(failures >= FAILURE_LIMIT) {
+            log_error("Perf zgen: Too many failures. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i);
+            Tss2_Sys_FlushContext(sapi_context, object_handle);
+            return false;
+        }
     }
 
     Tss2_Sys_FlushContext(sapi_context, object_handle);
@@ -587,6 +671,8 @@ void run_perf_getrandom(
         log_error("Perf: cannot allocate memory for result.");
         return;
     }
+
+    int failures = 0;
     result.size = 0;
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
@@ -598,10 +684,21 @@ void run_perf_getrandom(
         }
 
         result.data_points[i].rc = getrandom(sapi_context, &result.data_points[i].duration_s);
+        if (result.data_points[i].rc != TPM2_RC_SUCCESS) {
+            ++failures;
+        }
+
         ++result.size;
         log_info("Perf getrandom: %d: duration %f | rc %04x",
                 i, result.data_points[i].duration_s, result.data_points[i].rc);
-	printf("%lu%%\n", inc_and_get_progress_percentage(prog));
+
+        printf("%lu%%\n", increase_progress(prog));
+        if(failures >= FAILURE_LIMIT) {
+            log_error("Perf getrandom: Too many failures. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i);
+            free_result(&result);
+            return;
+        }
     }
 
     output_results(scenario, &result);
@@ -627,6 +724,7 @@ void run_perf_hash(
         return;
     }
 
+    int failures = 0;
     result.size = 0;
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
@@ -639,11 +737,22 @@ void run_perf_hash(
 
         result.data_points[i].rc = hash(sapi_context, &data,
                 scenario->hash.hash_alg, &result.data_points[i].duration_s);
+
+        if (result.data_points[i].rc != TPM2_RC_SUCCESS) {
+            ++failures;
+        }
         ++result.size;
         log_info("Perf hash: %d: algorithm %04x | duration %f | rc %04x",
                 i, scenario->hash.hash_alg, result.data_points[i].duration_s,
                 result.data_points[i].rc);
-	printf("%lu%%\n", inc_and_get_progress_percentage(prog));
+        printf("%lu%%\n", increase_progress(prog));
+
+        if(failures >= FAILURE_LIMIT) {
+            log_error("Perf hash: Too many failures. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i);
+            free_result(&result);
+            return;
+        }
     }
 
     output_results(scenario, &result);

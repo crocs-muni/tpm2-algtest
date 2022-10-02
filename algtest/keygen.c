@@ -66,6 +66,7 @@ bool test_detail(
         return false;
     }
 
+    int failures = 0;
     result->size = 0;
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
@@ -82,7 +83,16 @@ bool test_detail(
                 primary_handle, &outPublic, &outPrivate,
                 &result->data_points[i].duration_s);
 
+        if(result->data_points[i].rc == TPM2_RC_SUCCESS) {
+            if (!scenario->no_export) {
+                extract_keys(sapi_context, primary_handle, &outPublic, &outPrivate,
+                             &result->keypairs[i]);
+            }
+        } else {
+            ++failures;
+        }
         ++result->size;
+
         switch (scenario->key_params.type) {
         case TPM2_ALG_RSA:
             log_info("Keygen %d: RSA | keybits %d | duration %f | rc %04x",
@@ -106,17 +116,13 @@ bool test_detail(
             break;
         }
 
-        if (result->data_points[i].rc != TPM2_RC_SUCCESS) {
-            continue;
-        }
+        printf("%lu%%\n", increase_progress(prog));
 
-        if (!scenario->no_export) {
-            extract_keys(sapi_context, primary_handle, &outPublic, &outPrivate,
-                    &result->keypairs[i]);
+        if (failures >= FAILURE_LIMIT) {
+            log_error("Keygen: Too many failures. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i);
+            return false;
         }
-
-	prog->current++;
-	printf("%lu%%\n", get_progress_percentage(prog));
     }
     return true;
 }
@@ -157,7 +163,7 @@ void output_results(
     FILE* out = open_csv(filename, "duration,return_code");
     for (int i = 0; i < result->size; ++i) {
         struct keygen_data_point *dp = &result->data_points[i];
-        fprintf(out, "%f, %04x\n", dp->duration_s, dp->rc);
+        fprintf(out, "%f,%04x\n", dp->duration_s, dp->rc);
     }
     fclose(out);
 
@@ -169,10 +175,6 @@ void output_results(
     case TPM2_ALG_RSA:
         out = open_csv(filename_keys, "id;n;e;p;q;d;t");
         for (int i = 0; i < result->size; ++i) {
-            if (result->data_points[i].rc != TPM2_RC_SUCCESS) {
-                fprintf(out, "null;null;null;null;null;null;null\n");
-                continue;
-            }
             fprintf(out, "%d;", i);
             for (int j = 0; j < result->keypairs[i].public_key.rsa.size; ++j) {
                 fprintf(out, "%02X", result->keypairs[i].public_key.rsa.buffer[j]);
@@ -187,10 +189,6 @@ void output_results(
     case TPM2_ALG_ECC:
         out = open_csv(filename_keys, "id;x;y;private;t");
         for (int i = 0; i < result->size; ++i) {
-            if (result->data_points[i].rc != TPM2_RC_SUCCESS) {
-                fprintf(out, "null;null;null;null;null;null;null\n");
-                continue;
-            }
             fprintf(out, "%d;", i);
             for (int j = 0; j < result->keypairs[i].public_key.ecc.x.size; ++j) {
                 fprintf(out, "%02X", result->keypairs[i].public_key.ecc.x.buffer[j]);

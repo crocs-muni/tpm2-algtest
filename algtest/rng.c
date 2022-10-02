@@ -83,6 +83,7 @@ void run_rng_getrandom(
         log_error("Rng: cannot allocate memory for result.");
         return;
     }
+    int failures = 0;
     result.size = 0;
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
@@ -98,10 +99,20 @@ void run_rng_getrandom(
         result.data_points[i].bytes_number = buffer.size;
         memcpy(result.data_points[i].data, buffer.buffer, buffer.size);
 
+        if(result.data_points[i].rc != TPM2_RC_SUCCESS) {
+            ++failures;
+        }
         ++result.size;
         log_info("Rng %d: duration %f | rc %04x",
                  i, result.data_points[i].duration_s, result.data_points[i].rc);
-        printf("%lu%%\n", inc_and_get_progress_percentage(prog));
+        printf("%lu%%\n", increase_progress(prog));
+
+        if(failures >= FAILURE_LIMIT) {
+            log_error("Rng: Too many failures. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i);
+            free_result(&result);
+            return;
+        }
     }
 
     output_results(scenario, &result);
