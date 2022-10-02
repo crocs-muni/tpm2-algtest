@@ -263,7 +263,7 @@ bool run_ecc_sign(
 
 	    if(failures >= FAILURE_LIMIT) {
 	        log_error("Cryptoops ecc: Too many failures. Skipping remaining iterations.");
-	        skip_progress(prog, scenario->parameters.repetitions - i);
+	        skip_progress(prog, scenario->parameters.repetitions - i - 1);
             Tss2_Sys_FlushContext(sapi_context, object_handle);
             return false;
 	    }
@@ -393,7 +393,7 @@ bool run_rsa_sign(
 
         if(failures >= FAILURE_LIMIT) {
             log_error("Cryptoops rsa: Too many failures. Skipping remaining iterations.");
-            skip_progress(prog, scenario->parameters.repetitions - i);
+            skip_progress(prog, scenario->parameters.repetitions - i - 1);
             Tss2_Sys_FlushContext(sapi_context, object_handle);
             return false;
         }

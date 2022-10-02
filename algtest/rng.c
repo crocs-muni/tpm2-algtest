@@ -109,7 +109,7 @@ void run_rng_getrandom(
 
         if(failures >= FAILURE_LIMIT) {
             log_error("Rng: Too many failures. Skipping remaining iterations.");
-            skip_progress(prog, scenario->parameters.repetitions - i);
+            skip_progress(prog, scenario->parameters.repetitions - i - 1);
             free_result(&result);
             return;
         }
