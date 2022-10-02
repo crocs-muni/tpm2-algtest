@@ -120,7 +120,7 @@ bool test_detail(
 
         if (failures >= FAILURE_LIMIT) {
             log_error("Keygen: Too many failures. Skipping remaining iterations.");
-            skip_progress(prog, scenario->parameters.repetitions - i);
+            skip_progress(prog, scenario->parameters.repetitions - i - 1);
             return false;
         }
     }

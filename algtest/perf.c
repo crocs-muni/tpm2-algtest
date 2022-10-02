@@ -183,7 +183,7 @@ bool run_perf_sign(
 	    printf("%lu%%\n", increase_progress(prog));
         if(failures >= FAILURE_LIMIT) {
             log_error("Perf sign: Too many failures. Skipping remaining iterations.");
-            skip_progress(prog, scenario->parameters.repetitions - i);
+            skip_progress(prog, scenario->parameters.repetitions - i - 1);
             Tss2_Sys_FlushContext(sapi_context, object_handle);
             return false;
         }
@@ -261,7 +261,7 @@ bool run_perf_verifysignature(
         printf("%lu%%\n", increase_progress(prog));
         if(failures >= FAILURE_LIMIT) {
             log_error("Perf verifysignature: Too many failures. Skipping remaining iterations.");
-            skip_progress(prog, scenario->parameters.repetitions - i);
+            skip_progress(prog, scenario->parameters.repetitions - i - 1);
             Tss2_Sys_FlushContext(sapi_context, object_handle);
             return false;
         }
@@ -319,7 +319,7 @@ bool run_perf_rsa_encrypt(
         printf("%lu%%\n", increase_progress(prog));
         if(failures >= FAILURE_LIMIT) {
             log_error("Perf rsa_encrypt: Too many failures. Skipping remaining iterations.");
-            skip_progress(prog, scenario->parameters.repetitions - i);
+            skip_progress(prog, scenario->parameters.repetitions - i - 1);
             Tss2_Sys_FlushContext(sapi_context, object_handle);
             return false;
         }
@@ -381,7 +381,7 @@ bool run_perf_rsa_decrypt(
 
         if(failures >= FAILURE_LIMIT) {
             log_error("Perf rsa_decrypt: Too many failures. Skipping remaining iterations.");
-            skip_progress(prog, scenario->parameters.repetitions - i);
+            skip_progress(prog, scenario->parameters.repetitions - i - 1);
             Tss2_Sys_FlushContext(sapi_context, object_handle);
             return false;
         }
@@ -467,7 +467,7 @@ bool run_perf_encryptdecrypt(
 
         if(failures >= FAILURE_LIMIT) {
             log_error("Perf encryptdecrypt: Too many failures. Skipping remaining iterations.");
-            skip_progress(prog, scenario->parameters.repetitions - i);
+            skip_progress(prog, scenario->parameters.repetitions - i - 1);
             Tss2_Sys_FlushContext(sapi_context, object_handle);
             return false;
         }
@@ -537,7 +537,7 @@ bool run_perf_hmac(
         printf("%lu%%\n", increase_progress(prog));
         if(failures >= FAILURE_LIMIT) {
             log_error("Perf hmac: Too many failures. Skipping remaining iterations.");
-            skip_progress(prog, scenario->parameters.repetitions - i);
+            skip_progress(prog, scenario->parameters.repetitions - i - 1);
             Tss2_Sys_FlushContext(sapi_context, object_handle);
             return false;
         }
@@ -612,7 +612,7 @@ bool run_perf_zgen(
         printf("%lu%%\n", increase_progress(prog));
         if(failures >= FAILURE_LIMIT) {
             log_error("Perf zgen: Too many failures. Skipping remaining iterations.");
-            skip_progress(prog, scenario->parameters.repetitions - i);
+            skip_progress(prog, scenario->parameters.repetitions - i - 1);
             Tss2_Sys_FlushContext(sapi_context, object_handle);
             return false;
         }
@@ -701,7 +701,7 @@ void run_perf_getrandom(
         printf("%lu%%\n", increase_progress(prog));
         if(failures >= FAILURE_LIMIT) {
             log_error("Perf getrandom: Too many failures. Skipping remaining iterations.");
-            skip_progress(prog, scenario->parameters.repetitions - i);
+            skip_progress(prog, scenario->parameters.repetitions - i - 1);
             free_result(&result);
             return;
         }
@@ -755,7 +755,7 @@ void run_perf_hash(
 
         if(failures >= FAILURE_LIMIT) {
             log_error("Perf hash: Too many failures. Skipping remaining iterations.");
-            skip_progress(prog, scenario->parameters.repetitions - i);
+            skip_progress(prog, scenario->parameters.repetitions - i - 1);
             free_result(&result);
             return;
         }
