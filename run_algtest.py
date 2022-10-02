@@ -43,7 +43,7 @@ def zip(outdir):
             zipf.write(os.path.join(root, file))
 
 
-def compute_rsa_privates(filename, sep=";"):
+def compute_rsa_privates(filename):
     def extended_euclidean(a, b):
         x0, x1, y0, y1 = 0, 1, 1, 0
         while a != 0:
@@ -86,7 +86,7 @@ def compute_rsa_privates(filename, sep=";"):
 
     rows = []
     with open(filename) as infile:
-        reader = csv.DictReader(infile, delimiter=sep)
+        reader = csv.DictReader(infile, delimiter=',')
         for row in reader:
             rows.append(row)
 
@@ -99,7 +99,7 @@ def compute_rsa_privates(filename, sep=";"):
 
     with open(filename, 'w') as outfile:
         writer = csv.DictWriter(
-                outfile, delimiter=sep, fieldnames=list(rows[0].keys()))
+                outfile, delimiter=',', fieldnames=list(rows[0].keys()))
         writer.writeheader()
         for row in rows:
             writer.writerow(row)
@@ -376,7 +376,7 @@ def cryptoops_handler(args):
     print('Computing RSA privates...')
     for filename in glob.glob(os.path.join(detail_dir, 'Cryptoops_Sign:RSA_*.csv')):
         print(filename)
-        compute_rsa_privates(filename, sep=",")
+        compute_rsa_privates(filename)
 
 
 def rng_handler(args):
@@ -410,7 +410,7 @@ def format_handler(args):
     print('Computing RSA privates...')
     for filename in glob.glob(os.path.join(detail_dir, 'Cryptoops_Sign:RSA_*.csv')):
         print(filename)
-        compute_rsa_privates(filename, sep=",")
+        compute_rsa_privates(filename)
 
 
 def all_handler(args):
