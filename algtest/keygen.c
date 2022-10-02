@@ -49,7 +49,13 @@ bool test_detail(
         struct keygen_result *result,
 	struct progress *prog)
 {
+
     TPM2B_PUBLIC inPublic = prepare_template(&scenario->key_params);
+    // Workaround for instances where BN_P256 can be used only for ECDAA.
+    if (scenario->key_params.type == TPM2_ALG_ECC && scenario->key_params.parameters.eccDetail.curveID == TPM2_ECC_BN_P256) {
+        inPublic.publicArea.parameters.eccDetail.scheme.scheme = TPM2_ALG_ECDAA;
+        inPublic.publicArea.parameters.eccDetail.scheme.details.ecdaa.hashAlg = TPM2_ALG_SHA256;
+    }
 
     if (!scenario->no_export) {
         inPublic.publicArea.authPolicy = get_dup_policy(sapi_context);
