@@ -464,19 +464,19 @@ def extensive_handler(args):
 
 def write_header(file, detail_dir):
     manufacturer, vendor_str, fw = get_tpm_id(detail_dir)
-    file.write(f'Execution date/time;{datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")}\n')
-    file.write(f'Manufacturer;{manufacturer}\n')
-    file.write(f'Vendor string;{vendor_str}\n')
-    file.write(f'Firmware version;{fw}\n')
-    file.write(f'Image tag;{IMAGE_TAG}\n')
-    file.write(f'TPM devices;{";".join(glob.glob("/dev/tpm*"))}\n')
+    file.write(f'Execution date/time: {datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")}\n')
+    file.write(f'Manufacturer: {manufacturer}\n')
+    file.write(f'Vendor string: {vendor_str}\n')
+    file.write(f'Firmware version: {fw}\n')
+    file.write(f'Image tag: {IMAGE_TAG}\n')
+    file.write(f'TPM devices: {", ".join(glob.glob("/dev/tpm*"))}\n')
     try:
         system_manufacturer, product_name, system_version, bios_version, uname = get_system_id(detail_dir)
-        file.write(f'Device manufacturer;{system_manufacturer}\n')
-        file.write(f'Device name;{product_name}\n')
-        file.write(f'Device version;{system_version}\n')
-        file.write(f'BIOS version;{bios_version}\n')
-        file.write(f'System information;{uname}\n')
+        file.write(f'Device manufacturer: {system_manufacturer}\n')
+        file.write(f'Device name: {product_name}\n')
+        file.write(f'Device version: {system_version}\n')
+        file.write(f'BIOS version: {bios_version}\n')
+        file.write(f'System information: {uname}\n')
     except:
         pass
     file.write('\n')
@@ -520,7 +520,7 @@ def write_results_file(support_file, detail_dir):
                         line = line[line.find('"'):]
                         properties = properties[:-1] + '\t' + line
                     else:
-                        properties += line.replace(':', ';')
+                        properties += line
                 support_file.write(properties)
 
         algorithms_path = os.path.join(detail_dir, 'Capability_algorithms.txt')
@@ -553,36 +553,48 @@ def write_results_file(support_file, detail_dir):
 def write_perf_file(perf_file, detail_dir):
     perf_csvs = glob.glob(os.path.join(detail_dir, 'Perf_*.csv'))
     perf_csvs.sort()
-    command = ''
     for filepath in perf_csvs:
         filename = os.path.basename(filepath)
         params_idx = filename.find(':')
         suffix_idx = filename.find('.csv')
-        new_command = filename[5:suffix_idx if params_idx == -1 else params_idx]
+        command = filename[5:suffix_idx if params_idx == -1 else params_idx]
         params = filename[params_idx+1:suffix_idx].split('_')
-        if new_command != command:
-            command = new_command
-            perf_file.write('TPM2_' + command + '\n\n')
 
+        perf_file.write('TPM2_' + command + ':\n')
         if command == 'GetRandom':
-            perf_file.write('Data length (bytes):;32\n')
+            perf_file.write('  data length (bytes): 32\n')
         elif command in ('Sign', 'VerifySignature', 'RSA_Encrypt', 'RSA_Decrypt'):
-            perf_file.write(f'Key parameters:;{params[0]} {params[1]};Scheme:;{params[2]}\n')
+            perf_file.write(f'  key parameters: {params[0]} {params[1]}\n')
+            perf_file.write(f'  scheme: {params[2]}\n')
         elif command == 'EncryptDecrypt':
-            perf_file.write(f'Algorithm:;{params[0]};Key length:;{params[1]};Mode:;{params[2]};Encrypt/decrypt?:;{params[3]};Data length (bytes):;256\n')
+            perf_file.write(f'  algorithm: {params[0]}\n')
+            perf_file.write(f'  key length: {params[1]}\n')
+            perf_file.write(f'  mode: {params[2]}\n')
+            perf_file.write(f'  encrypt/decrypt?: {params[3]}\n')
+            perf_file.write('  data length (bytes): 256\n')
         elif command == 'HMAC':
-            perf_file.write('Hash algorithm:;SHA-256;Data length (bytes):;256\n')
+            perf_file.write('  hash algorithm: SHA-256\n')
+            perf_file.write('  data length (bytes): 256\n')
         elif command == 'Hash':
-            perf_file.write(f'Hash algorithm:;{params[0]};Data length (bytes):;256\n')
+            perf_file.write(f'  hash algorithm: {params[0]}\n')
+            perf_file.write('  data length (bytes): 256\n')
         elif command == 'ZGen':
-            perf_file.write(f'Key parameters:;{params[0]};Scheme:;{params[1]}\n')
+            perf_file.write(f'  key parameters: {params[0]}\n')
+            perf_file.write(f'  scheme: {params[1]}\n')
         else:
-            perf_file.write(f'Key parameters:;{" ".join(params)}\n')
+            perf_file.write(f'  key parameters: {" ".join(params)}\n')
 
         with open(filepath, 'r') as infile:
             avg_op, min_op, max_op, total, success, fail, error = compute_stats(infile)
-            perf_file.write(f'operation stats (ms/op):;avg op:;{avg_op:.2f};min op:;{min_op:.2f};max op:;{max_op:.2f}\n')
-            perf_file.write(f'operation info:;total iterations:;{total};successful:;{success};failed:;{fail};error:;{"None" if not error else error}\n\n')
+            perf_file.write(f'Operation stats (ms/op):\n')
+            perf_file.write(f'  avg op: {avg_op:.2f}\n')
+            perf_file.write(f'  min op: {min_op:.2f}\n')
+            perf_file.write(f'  max op: {max_op:.2f}\n')
+            perf_file.write(f'Operation info:\n')
+            perf_file.write(f'  total iterations: {total}\n')
+            perf_file.write(f'  successful: {success}\n')
+            perf_file.write(f'  failed: {fail}\n')
+            perf_file.write(f'  error: {"None" if not error else error}\n\n')
 
 
 def create_result_files(outdir):
