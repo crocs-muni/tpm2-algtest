@@ -10,7 +10,7 @@ import hashlib
 import math
 
 DEVICE = '/dev/tpm0'
-IMAGE_TAG = 'v1.0'
+IMAGE_TAG = 'v2.0'
 
 
 def run_algtest(run_command, logfile):
@@ -250,6 +250,12 @@ def get_system_id(detail_dir):
     return manufacturer, product_name, version, bios_version, uname
 
 
+def get_image_tag(detail_dir):
+    with open(os.path.join(detail_dir, 'image_tag.txt'), 'r') as f:
+        image_tag = f.read()
+    return image_tag
+
+
 def system_info(detail_dir):
     with open(os.path.join(detail_dir, 'image_tag.txt'), 'w') as f:
         f.write(IMAGE_TAG)
@@ -463,12 +469,13 @@ def extensive_handler(args):
 
 
 def write_header(file, detail_dir):
+    image_tag = get_image_tag(detail_dir)
     manufacturer, vendor_str, fw = get_tpm_id(detail_dir)
     file.write(f'Execution date/time: {datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")}\n')
     file.write(f'Manufacturer: {manufacturer}\n')
     file.write(f'Vendor string: {vendor_str}\n')
     file.write(f'Firmware version: {fw}\n')
-    file.write(f'Image tag: {IMAGE_TAG}\n')
+    file.write(f'Image tag: {image_tag}\n')
     file.write(f'TPM devices: {", ".join(glob.glob("/dev/tpm*"))}\n')
     try:
         system_manufacturer, product_name, system_version, bios_version, uname = get_system_id(detail_dir)
