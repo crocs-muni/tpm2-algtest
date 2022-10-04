@@ -507,7 +507,7 @@ def compute_stats(infile):
     return avg_op * 1000, min_op * 1000, max_op * 1000, total, success, fail, error # sec -> ms
 
 
-def write_support_file(support_file, detail_dir):
+def write_results_file(support_file, detail_dir):
         properties_path = os.path.join(detail_dir, 'Capability_properties-fixed.txt')
         if os.path.isfile(properties_path):
             support_file.write('\nCapability_properties-fixed\n')
@@ -590,13 +590,11 @@ def create_result_files(outdir):
     manufacturer, vendor_str, fw = get_tpm_id(detail_dir)
     file_name = manufacturer + '_' + vendor_str + '_' + fw + '.csv'
 
-    os.makedirs(os.path.join(outdir, 'results'), exist_ok=True)
-    with open(os.path.join(outdir, 'results', file_name), 'w') as support_file:
-        write_header(support_file, detail_dir)
-        write_support_file(support_file, detail_dir)
+    with open(os.path.join(outdir, "results.txt"), 'w') as results_file:
+        write_header(results_file, detail_dir)
+        write_results_file(results_file, detail_dir)
 
-    os.makedirs(os.path.join(outdir, 'performance'), exist_ok=True)
-    with open(os.path.join(outdir, 'performance', file_name), 'w') as perf_file:
+    with open(os.path.join(outdir, 'performance.txt'), 'w') as perf_file:
         write_header(perf_file, detail_dir)
         write_perf_file(perf_file, detail_dir)
 
