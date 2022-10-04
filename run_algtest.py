@@ -477,29 +477,22 @@ def write_header(file, detail_dir):
     file.write('\n')
 
 
-def compute_stats(infile, *, rsa2048=False):
-    ignore = 5 if rsa2048 else 0
+def compute_stats(infile):
     success, fail, sum_op, min_op, max_op, avg_op = 0, 0, 0, 10000000000, 0, 0
     error = None
-    for line in infile:
-        if line.startswith('duration'):
-            continue
-        if ignore > 0:
-            ignore -= 1
-            continue
-        t, rc = line.split(',')[:2]
-        rc = rc.replace(' ', '')
-        rc = rc.replace('\n', '')
-        if rc == '0000':
-            success += 1
-        else:
-            error = rc
+    csv_input = csv.DictReader(infile, delimiter=',')
+
+    for record in csv_input:
+        if record["return_code"] != '0000':
+            error = record["return_code"]
             fail += 1
             continue
-        t = float(t)
+        success += 1
+        t = float(record["duration"])
         sum_op += t
         if t > max_op: max_op = t
         if t < min_op: min_op = t
+
     total = success + fail
     if success != 0:
         avg_op = (sum_op / success)
@@ -568,7 +561,7 @@ def write_perf_file(perf_file, detail_dir):
 
         if command == 'GetRandom':
             perf_file.write('Data length (bytes):;32\n')
-        elif command in [ 'Sign', 'VerifySignature', 'RSA_Encrypt', 'RSA_Decrypt' ]:
+        elif command in ('Sign', 'VerifySignature', 'RSA_Encrypt', 'RSA_Decrypt'):
             perf_file.write(f'Key parameters:;{params[0]} {params[1]};Scheme:;{params[2]}\n')
         elif command == 'EncryptDecrypt':
             perf_file.write(f'Algorithm:;{params[0]};Key length:;{params[1]};Mode:;{params[2]};Encrypt/decrypt?:;{params[3]};Data length (bytes):;256\n')
@@ -576,6 +569,8 @@ def write_perf_file(perf_file, detail_dir):
             perf_file.write('Hash algorithm:;SHA-256;Data length (bytes):;256\n')
         elif command == 'Hash':
             perf_file.write(f'Hash algorithm:;{params[0]};Data length (bytes):;256\n')
+        elif command == 'ZGen':
+            perf_file.write(f'Key parameters:;{params[0]};Scheme:;{params[1]}\n')
         else:
             perf_file.write(f'Key parameters:;{" ".join(params)}\n')
 
