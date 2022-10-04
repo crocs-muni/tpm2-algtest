@@ -173,7 +173,7 @@ void output_results(
 
     switch (scenario->key_params.type) {
     case TPM2_ALG_RSA:
-        out = open_csv(filename_keys, "id,n,e,p,q,d,t");
+        out = open_csv(filename_keys, "id,n,e,p,t");
         for (int i = 0; i < result->size; ++i) {
             fprintf(out, "%d,", i);
             for (int j = 0; j < result->keypairs[i].public_key.rsa.size; ++j) {
@@ -183,7 +183,7 @@ void output_results(
             for (int j = 0; j < result->keypairs[i].private_key.rsa.size; ++j) {
                 fprintf(out, "%02X", result->keypairs[i].private_key.rsa.buffer[j]);
             }
-            fprintf(out, ",,,%d\n", (int) (result->data_points[i].duration_s * 1000));
+            fprintf(out, ",%f\n", result->data_points[i].duration_s);
         }
         break;
     case TPM2_ALG_ECC:
@@ -201,7 +201,7 @@ void output_results(
             for (int j = 0; j < result->keypairs[i].private_key.ecc.size; ++j) {
                 fprintf(out, "%02X", result->keypairs[i].private_key.ecc.buffer[j]);
             }
-            fprintf(out, ",%d\n", (int) (result->data_points[i].duration_s * 1000));
+            fprintf(out, ",%f\n", result->data_points[i].duration_s);
         }
         break;
     case TPM2_ALG_KEYEDHASH:
