@@ -422,7 +422,7 @@ def all_handler(args):
         args.num = 1000
     cryptoops_handler(args)
     if default_num:
-        args.num = 1024
+        args.num = 16384
     rng_handler(args)
     if default_num:
         args.num = 1000
