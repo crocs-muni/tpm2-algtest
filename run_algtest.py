@@ -331,10 +331,11 @@ def keygen_handler(args):
     with open(os.path.join(detail_dir, 'keygen_log.txt'), 'w') as logfile:
         run_algtest(run_command, logfile)
 
-    print('Computing RSA private keys...')
-    for filename in glob.glob(os.path.join(detail_dir, 'Keygen:RSA_*.csv')):
-        print(filename)
-        compute_rsa_privates(filename)
+    if not args.only_measure:
+        print('Computing RSA private keys...')
+        for filename in glob.glob(os.path.join(detail_dir, 'Keygen:RSA_*.csv')):
+            print(filename)
+            compute_rsa_privates(filename)
 
 
 def perf_handler(args):
@@ -368,15 +369,16 @@ def cryptoops_handler(args):
     with open(os.path.join(detail_dir, 'cryptoops_log.txt'), 'w') as logfile:
         run_algtest(run_command, logfile)
 
-    print('Computing ECC nonces...')
-    for filename in glob.glob(os.path.join(detail_dir, 'Cryptoops_Sign:ECC_*.csv')):
-        print(filename)
-        compute_nonce(filename)
+    if not args.only_measure:
+        print('Computing ECC nonces...')
+        for filename in glob.glob(os.path.join(detail_dir, 'Cryptoops_Sign:ECC_*.csv')):
+            print(filename)
+            compute_nonce(filename)
 
-    print('Computing RSA privates...')
-    for filename in glob.glob(os.path.join(detail_dir, 'Cryptoops_Sign:RSA_*.csv')):
-        print(filename)
-        compute_rsa_privates(filename)
+        print('Computing RSA privates...')
+        for filename in glob.glob(os.path.join(detail_dir, 'Cryptoops_Sign:RSA_*.csv')):
+            print(filename)
+            compute_rsa_privates(filename)
 
 
 def rng_handler(args):
@@ -401,16 +403,17 @@ def format_handler(args):
         print('There is no output yet, need to run tests.')
         return
 
-    create_result_files(args.outdir)
-    print('Computing ECC nonces...')
-    for filename in glob.glob(os.path.join(detail_dir, 'Cryptoops_Sign:ECC_*.csv')):
-        print(filename)
-        compute_nonce(filename)
+    if not args.only_measure:
+        create_result_files(args.outdir)
+        print('Computing ECC nonces...')
+        for filename in glob.glob(os.path.join(detail_dir, 'Cryptoops_Sign:ECC_*.csv')):
+            print(filename)
+            compute_nonce(filename)
 
-    print('Computing RSA privates...')
-    for filename in glob.glob(os.path.join(detail_dir, 'Cryptoops_Sign:RSA_*.csv')):
-        print(filename)
-        compute_rsa_privates(filename)
+        print('Computing RSA privates...')
+        for filename in glob.glob(os.path.join(detail_dir, 'Cryptoops_Sign:RSA_*.csv')):
+            print(filename)
+            compute_rsa_privates(filename)
 
 
 def all_handler(args):
@@ -432,7 +435,8 @@ def all_handler(args):
     keygen_handler(args)
     if default_num:
         args.num = None
-    create_result_files(args.outdir)
+    if not args.only_measure:
+        create_result_files(args.outdir)
 
 
 def extensive_handler(args):
@@ -454,7 +458,8 @@ def extensive_handler(args):
     keygen_handler(args)
     if default_num:
         args.num = None
-    create_result_files(args.outdir)
+    if not args.only_measure:
+        create_result_files(args.outdir)
 
 
 def write_header(file, detail_dir):
@@ -607,6 +612,7 @@ def main():
     parser.add_argument('-c', '--command', type=str, required=False)
     parser.add_argument('-o', '--outdir', type=str, required=False, default='out')
     parser.add_argument('--docker', action='store_true')
+    parser.add_argument('--only-measure', action='store_true', default=False)
     args = parser.parse_args()
 
     if not os.path.exists(DEVICE):
