@@ -410,7 +410,11 @@ def format_handler(args):
         return
 
     if not args.only_measure:
+        if args.include_legacy:
+            create_legacy_result_files(args.outdir)
+
         create_result_files(args.outdir)
+
         print('Computing ECC nonces...')
         for filename in glob.glob(os.path.join(detail_dir, 'Cryptoops_Sign:ECC_*.csv')):
             print(filename)
@@ -444,6 +448,9 @@ def all_handler(args):
     if not args.only_measure:
         create_result_files(args.outdir)
 
+        if args.include_legacy:
+            create_legacy_result_files(args.outdir)
+
 
 def extensive_handler(args):
     print("Running all tests with extensive setting...")
@@ -466,6 +473,9 @@ def extensive_handler(args):
         args.num = None
     if not args.only_measure:
         create_result_files(args.outdir)
+
+        if args.include_legacy:
+            create_legacy_result_files(args.outdir)
 
 
 def write_header(file, detail_dir):
@@ -514,10 +524,10 @@ def compute_stats(infile):
     return avg_op * 1000, min_op * 1000, max_op * 1000, total, success, fail, error # sec -> ms
 
 
-def write_results_file(support_file, detail_dir):
+def write_results_file(results_file, detail_dir):
         properties_path = os.path.join(detail_dir, 'Capability_properties-fixed.txt')
         if os.path.isfile(properties_path):
-            support_file.write('\nCapability_properties-fixed\n')
+            results_file.write('\nCapability_properties-fixed\n')
             with open(properties_path, 'r') as infile:
                 properties = ""
                 for line in infile:
@@ -528,33 +538,33 @@ def write_results_file(support_file, detail_dir):
                         properties = properties[:-1] + '\t' + line
                     else:
                         properties += line
-                support_file.write(properties)
+                results_file.write(properties)
 
         algorithms_path = os.path.join(detail_dir, 'Capability_algorithms.txt')
         if os.path.isfile(algorithms_path):
-            support_file.write('\nCapability_algorithms\n')
+            results_file.write('\nCapability_algorithms\n')
             with open(algorithms_path, 'r') as infile:
                 for line in infile:
                     if line.startswith('  value:'):
                         line = line[line.find('0x'):]
-                        support_file.write(line)
+                        results_file.write(line)
 
         commands_path = os.path.join(detail_dir, 'Capability_commands.txt')
         if os.path.isfile(commands_path):
-            support_file.write('\nCapability_commands\n')
+            results_file.write('\nCapability_commands\n')
             with open(commands_path, 'r') as infile:
                 for line in infile:
                     if line.startswith('  commandIndex:'):
                         line = line[line.find('0x'):]
-                        support_file.write(line)
+                        results_file.write(line)
 
         curves_path = os.path.join(detail_dir, 'Capability_ecc-curves.txt')
         if os.path.isfile(curves_path):
-            support_file.write('\nCapability_ecc-curves\n')
+            results_file.write('\nCapability_ecc-curves\n')
             with open(curves_path, 'r') as infile:
                 for line in infile:
                     line = line[line.find('(') + 1:line.find(')')]
-                    support_file.write(line + '\n')
+                    results_file.write(line + '\n')
 
 
 def write_perf_file(perf_file, detail_dir):
@@ -607,7 +617,6 @@ def write_perf_file(perf_file, detail_dir):
 def create_result_files(outdir):
     detail_dir = os.path.join(outdir, 'detail')
     manufacturer, vendor_str, fw = get_tpm_id(detail_dir)
-    file_name = manufacturer + '_' + vendor_str + '_' + fw + '.csv'
 
     with open(os.path.join(outdir, "results.txt"), 'w') as results_file:
         write_header(results_file, detail_dir)
@@ -616,6 +625,120 @@ def create_result_files(outdir):
     with open(os.path.join(outdir, 'performance.txt'), 'w') as perf_file:
         write_header(perf_file, detail_dir)
         write_perf_file(perf_file, detail_dir)
+
+
+def write_legacy_header(file, detail_dir):
+    manufacturer, vendor_str, fw = get_tpm_id(detail_dir)
+    file.write(f'Execution date/time;{datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")}\n')
+    file.write(f'Manufacturer;{manufacturer}\n')
+    file.write(f'Vendor string;{vendor_str}\n')
+    file.write(f'Firmware version;{fw}\n')
+    file.write(f'Image tag;{IMAGE_TAG}\n')
+    file.write(f'TPM devices;{";".join(glob.glob("/dev/tpm*"))}\n')
+    try:
+        system_manufacturer, product_name, system_version, bios_version, uname = get_system_id(detail_dir)
+        file.write(f'Device manufacturer;{system_manufacturer}\n')
+        file.write(f'Device name;{product_name}\n')
+        file.write(f'Device version;{system_version}\n')
+        file.write(f'BIOS version;{bios_version}\n')
+        file.write(f'System information;{uname}\n')
+    except:
+        pass
+    file.write('\n')
+
+
+def write_legacy_results_file(results_file, detail_dir):
+        properties_path = os.path.join(detail_dir, 'Capability_properties-fixed.txt')
+        if os.path.isfile(properties_path):
+            results_file.write('\nCapability_properties-fixed\n')
+            with open(properties_path, 'r') as infile:
+                properties = ""
+                for line in infile:
+                    if line.startswith('  as UINT32:'):
+                        continue
+                    if line.startswith('  as string:'):
+                        line = line[line.find('"'):]
+                        properties = properties[:-1] + '\t' + line
+                    else:
+                        properties += line.replace(':', ';')
+                results_file.write(properties)
+
+        algorithms_path = os.path.join(detail_dir, 'Capability_algorithms.txt')
+        if os.path.isfile(algorithms_path):
+            results_file.write('\nCapability_algorithms\n')
+            with open(algorithms_path, 'r') as infile:
+                for line in infile:
+                    if line.startswith('  value:'):
+                        line = line[line.find('0x'):]
+                        results_file.write(line)
+
+        commands_path = os.path.join(detail_dir, 'Capability_commands.txt')
+        if os.path.isfile(commands_path):
+            results_file.write('\nCapability_commands\n')
+            with open(commands_path, 'r') as infile:
+                for line in infile:
+                    if line.startswith('  commandIndex:'):
+                        line = line[line.find('0x'):]
+                        results_file.write(line)
+
+        curves_path = os.path.join(detail_dir, 'Capability_ecc-curves.txt')
+        if os.path.isfile(curves_path):
+            results_file.write('\nCapability_ecc-curves\n')
+            with open(curves_path, 'r') as infile:
+                for line in infile:
+                    line = line[line.find('(') + 1:line.find(')')]
+                    results_file.write(line + '\n')
+
+
+def write_legacy_perf_file(perf_file, detail_dir):
+    perf_csvs = glob.glob(os.path.join(detail_dir, 'Perf_*.csv'))
+    perf_csvs.sort()
+    command = ''
+    for filepath in perf_csvs:
+        filename = os.path.basename(filepath)
+        params_idx = filename.find(':')
+        suffix_idx = filename.find('.csv')
+        new_command = filename[5:suffix_idx if params_idx == -1 else params_idx]
+        params = filename[params_idx+1:suffix_idx].split('_')
+        if new_command != command:
+            command = new_command
+            perf_file.write('TPM2_' + command + '\n\n')
+
+        if command == 'GetRandom':
+            perf_file.write('Data length (bytes):;32\n')
+        elif command in ('Sign', 'VerifySignature', 'RSA_Encrypt', 'RSA_Decrypt'):
+            perf_file.write(f'Key parameters:;{params[0]} {params[1]};Scheme:;{params[2]}\n')
+        elif command == 'EncryptDecrypt':
+            perf_file.write(f'Algorithm:;{params[0]};Key length:;{params[1]};Mode:;{params[2]};Encrypt/decrypt?:;{params[3]};Data length (bytes):;256\n')
+        elif command == 'HMAC':
+            perf_file.write('Hash algorithm:;SHA-256;Data length (bytes):;256\n')
+        elif command == 'Hash':
+            perf_file.write(f'Hash algorithm:;{params[0]};Data length (bytes):;256\n')
+        elif command == 'ZGen':
+            perf_file.write(f'Key parameters:;{params[0]};Scheme:;{params[1]}\n')
+        else:
+            perf_file.write(f'Key parameters:;{" ".join(params)}\n')
+
+        with open(filepath, 'r') as infile:
+            avg_op, min_op, max_op, total, success, fail, error = compute_stats(infile)
+            perf_file.write(f'operation stats (ms/op):;avg op:;{avg_op:.2f};min op:;{min_op:.2f};max op:;{max_op:.2f}\n')
+            perf_file.write(f'operation info:;total iterations:;{total};successful:;{success};failed:;{fail};error:;{"None" if not error else error}\n\n')
+
+
+def create_legacy_result_files(outdir):
+    detail_dir = os.path.join(outdir, 'detail')
+    manufacturer, vendor_str, fw = get_tpm_id(detail_dir)
+    file_name = manufacturer + '_' + vendor_str + '_' + fw + '.csv'
+
+    os.makedirs(os.path.join(outdir, 'results'), exist_ok=True)
+    with open(os.path.join(outdir, 'results', file_name), 'w') as results_file:
+        write_legacy_header(results_file, detail_dir)
+        write_legacy_results_file(results_file, detail_dir)
+
+    os.makedirs(os.path.join(outdir, 'performance'), exist_ok=True)
+    with open(os.path.join(outdir, 'performance', file_name), 'w') as perf_file:
+        write_legacy_header(perf_file, detail_dir)
+        write_legacy_perf_file(perf_file, detail_dir)
 
 
 def main():
@@ -630,6 +753,7 @@ def main():
     parser.add_argument('-o', '--outdir', type=str, required=False, default='out')
     parser.add_argument('--docker', action='store_true')
     parser.add_argument('--only-measure', action='store_true', default=False)
+    parser.add_argument('--include-legacy', action='store_true', default=False)
     args = parser.parse_args()
 
     if not os.path.exists(DEVICE):
