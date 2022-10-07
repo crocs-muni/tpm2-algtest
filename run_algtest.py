@@ -23,17 +23,17 @@ def run_algtest(run_command, logfile):
 
 def add_args(run_command, args):
     if args.num:
-        run_command += [ '-n', str(args.num) ]
+        run_command += ['-n', str(args.num)]
     if args.duration:
-        run_command += [ '-d', str(args.duration) ]
+        run_command += ['-d', str(args.duration)]
     if args.keytype:
-        run_command += [ '-t', args.keytype ]
+        run_command += ['-t', args.keytype]
     if args.keylen:
-        run_command += [ '-l', str(args.keylen) ]
+        run_command += ['-l', str(args.keylen)]
     if args.curveid:
-        run_command += [ '-C', str(args.curveid) ]
+        run_command += ['-C', str(args.curveid)]
     if args.command:
-        run_command += [ '-c', args.command ]
+        run_command += ['-c', args.command]
 
 
 def zip(outdir):
@@ -135,8 +135,8 @@ def compute_nonce(filename):
     def compute_row(row):
         try:
             digest = int(row['digest'], 16)
-            curve = { 0x3: "P256", 0x4: "P384", 0x10: "BN256" }[int(row['curve'], 16)]
-            algorithm = { 0x18: "ECDSA", 0x1a: "ECDAA", 0x1b: "SM2", 0x1c: "ECSCHNORR" }[int(row['algorithm'], 16)]
+            curve = {0x3: "P256", 0x4: "P384", 0x10: "BN256"}[int(row['curve'], 16)]
+            algorithm = {0x18: "ECDSA", 0x1a: "ECDAA", 0x1b: "SM2", 0x1c: "ECSCHNORR"}[int(row['algorithm'], 16)]
             signature_r = int(row['signature_r'], 16)
             signature_s = int(row['signature_s'], 16)
             private_key = int(row['private_key'], 16)
@@ -276,61 +276,27 @@ def system_info(detail_dir):
 
 def capability_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
-    if args.docker:
-        run_command = [ 'docker', 'run', '-it', '--init', '--device=' + DEVICE,
-                '--entrypoint=tpm2_getcap', 'simonstruk/tpm2-algtest:' + IMAGE_TAG ]
-    else:
-        run_command = [ 'sudo', 'tpm2_getcap' ]
-    run_command += [ '-T', 'device' ]
+    run_command = ['sudo', 'tpm2_getcap', '-T', 'device']
 
     print('Running capability test...')
 
-    with open(os.path.join(detail_dir, 'Capability_algorithms.txt'), 'w') as outfile:
-        try:
-            subprocess.run(run_command + ['-c', 'algorithms'], stdout=outfile, stderr=subprocess.DEVNULL).check_returncode()
-        except:
-            subprocess.run(run_command + ['algorithms'], stdout=outfile).check_returncode()
-
-    with open(os.path.join(detail_dir, 'Capability_commands.txt'), 'w') as outfile:
-        try:
-            subprocess.run(run_command + ['-c', 'commands'], stdout=outfile, stderr=subprocess.DEVNULL).check_returncode()
-        except:
-            subprocess.run(run_command + ['commands'], stdout=outfile).check_returncode()
-
-    with open(os.path.join(detail_dir, 'Capability_properties-fixed.txt'), 'w') as outfile:
-        try:
-            subprocess.run(run_command + ['-c', 'properties-fixed'], stdout=outfile, stderr=subprocess.DEVNULL).check_returncode()
-        except:
-            subprocess.run(run_command + ['properties-fixed'], stdout=outfile).check_returncode()
-
-    with open(os.path.join(detail_dir, 'Capability_properties-variable.txt'), 'w') as outfile:
-        try:
-            subprocess.run(run_command + ['-c', 'properties-variable'], stdout=outfile, stderr=subprocess.DEVNULL).check_returncode()
-        except:
-            subprocess.run(run_command + ['properties-variable'], stdout=outfile).check_returncode()
-
-    with open(os.path.join(detail_dir, 'Capability_ecc-curves.txt'), 'w') as outfile:
-        try:
-            subprocess.run(run_command + ['-c', 'ecc-curves'], stdout=outfile, stderr=subprocess.DEVNULL).check_returncode()
-        except:
-            subprocess.run(run_command + ['ecc-curves'], stdout=outfile).check_returncode()
-
-    with open(os.path.join(detail_dir, 'Capability_handles-persistent.txt'), 'w') as outfile:
-        try:
-            subprocess.run(run_command + ['-c', 'handles-persistent'], stdout=outfile, stderr=subprocess.DEVNULL).check_returncode()
-        except:
-            subprocess.run(run_command + ['handles-persistent'], stdout=outfile).check_returncode()
+    for command in ("algorithms", "commands", "properties-fixed", "properties-variable", "ecc-curves", "handles-persistent"):
+            with open(os.path.join(detail_dir, f"Capability_{command}.txt"), 'w') as outfile:
+                try:
+                    subprocess.run(run_command + ["-c", command], stdout=outfile, stderr=subprocess.DEVNULL).check_returncode()
+                except:
+                    subprocess.run(run_command + [command], stdout=outfile).check_returncode()
 
 
 def keygen_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
     if args.docker:
-        run_command = [ 'docker', 'run', '-it', '--init', '--device=' + DEVICE,
+        run_command = ['docker', 'run', '-it', '--init', '--device=' + DEVICE,
                 '--volume=' + os.path.join(os.getcwd(), detail_dir) + ':/tpm2-algtest/build/out:z',
-                'simonstruk/tpm2-algtest:' + IMAGE_TAG ]
+                'simonstruk/tpm2-algtest:' + IMAGE_TAG]
     else:
-        run_command = [ 'sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir ]
-    run_command += ['-T', 'device', '-s', 'keygen' ]
+        run_command = ['sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir]
+    run_command += ['-T', 'device', '-s', 'keygen']
     add_args(run_command, args)
 
     print('Running keygen test...')
@@ -347,12 +313,12 @@ def keygen_handler(args):
 def perf_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
     if args.docker:
-        run_command = [ 'docker', 'run', '-it', '--init', '--device=' + DEVICE,
+        run_command = ['docker', 'run', '-it', '--init', '--device=' + DEVICE,
                 '--volume=' + os.path.join(os.getcwd(), detail_dir) + ':/tpm2-algtest/build/out:z',
-                'simonstruk/tpm2-algtest:' + IMAGE_TAG ]
+                'simonstruk/tpm2-algtest:' + IMAGE_TAG]
     else:
-        run_command = [ 'sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir ]
-    run_command += ['-T', 'device', '-s', 'perf' ]
+        run_command = ['sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir]
+    run_command += ['-T', 'device', '-s', 'perf']
     add_args(run_command, args)
 
     print('Running perf test...')
@@ -363,12 +329,12 @@ def perf_handler(args):
 def cryptoops_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
     if args.docker:
-        run_command = [ 'docker', 'run', '-it', '--init', '--device=' + DEVICE,
+        run_command = ['docker', 'run', '-it', '--init', '--device=' + DEVICE,
                 '--volume=' + os.path.join(os.getcwd(), detail_dir) + ':/tpm2-algtest/build/out:z',
-                'simonstruk/tpm2-algtest:' + IMAGE_TAG ]
+                'simonstruk/tpm2-algtest:' + IMAGE_TAG]
     else:
-        run_command = [ 'sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir ]
-    run_command += ['-T', 'device', '-s', 'cryptoops' ]
+        run_command = ['sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir]
+    run_command += ['-T', 'device', '-s', 'cryptoops']
     add_args(run_command, args)
 
     print('Running cryptoops test...')
@@ -390,12 +356,12 @@ def cryptoops_handler(args):
 def rng_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
     if args.docker:
-        run_command = [ 'docker', 'run', '-it', '--init', '--device=' + DEVICE,
+        run_command = ['docker', 'run', '-it', '--init', '--device=' + DEVICE,
                 '--volume=' + os.path.join(os.getcwd(), detail_dir) + ':/tpm2-algtest/build/out:z',
-                'simonstruk/tpm2-algtest:' + IMAGE_TAG ]
+                'simonstruk/tpm2-algtest:' + IMAGE_TAG]
     else:
-        run_command = [ 'sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir ]
-    run_command += ['-T', 'device', '-s', 'rng' ]
+        run_command = ['sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir]
+    run_command += ['-T', 'device', '-s', 'rng']
     add_args(run_command, args)
 
     print('Running rng test...')
