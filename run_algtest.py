@@ -290,13 +290,7 @@ def capability_handler(args):
 
 def keygen_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
-    if args.docker:
-        run_command = ['docker', 'run', '-it', '--init', '--device=' + DEVICE,
-                '--volume=' + os.path.join(os.getcwd(), detail_dir) + ':/tpm2-algtest/build/out:z',
-                'simonstruk/tpm2-algtest:' + IMAGE_TAG]
-    else:
-        run_command = ['sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir]
-    run_command += ['-T', 'device', '-s', 'keygen']
+    run_command = ['sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir, '-T', 'device', '-s', 'keygen']
     add_args(run_command, args)
 
     print('Running keygen test...')
@@ -312,13 +306,7 @@ def keygen_handler(args):
 
 def perf_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
-    if args.docker:
-        run_command = ['docker', 'run', '-it', '--init', '--device=' + DEVICE,
-                '--volume=' + os.path.join(os.getcwd(), detail_dir) + ':/tpm2-algtest/build/out:z',
-                'simonstruk/tpm2-algtest:' + IMAGE_TAG]
-    else:
-        run_command = ['sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir]
-    run_command += ['-T', 'device', '-s', 'perf']
+    run_command = ['sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir, '-T', 'device', '-s', 'perf']
     add_args(run_command, args)
 
     print('Running perf test...')
@@ -328,13 +316,7 @@ def perf_handler(args):
 
 def cryptoops_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
-    if args.docker:
-        run_command = ['docker', 'run', '-it', '--init', '--device=' + DEVICE,
-                '--volume=' + os.path.join(os.getcwd(), detail_dir) + ':/tpm2-algtest/build/out:z',
-                'simonstruk/tpm2-algtest:' + IMAGE_TAG]
-    else:
-        run_command = ['sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir]
-    run_command += ['-T', 'device', '-s', 'cryptoops']
+    run_command = ['sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir, '-T', 'device', '-s', 'cryptoops']
     add_args(run_command, args)
 
     print('Running cryptoops test...')
@@ -355,13 +337,7 @@ def cryptoops_handler(args):
 
 def rng_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
-    if args.docker:
-        run_command = ['docker', 'run', '-it', '--init', '--device=' + DEVICE,
-                '--volume=' + os.path.join(os.getcwd(), detail_dir) + ':/tpm2-algtest/build/out:z',
-                'simonstruk/tpm2-algtest:' + IMAGE_TAG]
-    else:
-        run_command = ['sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir]
-    run_command += ['-T', 'device', '-s', 'rng']
+    run_command = ['sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir, '-T', 'device', '-s', 'rng']
     add_args(run_command, args)
 
     print('Running rng test...')
@@ -718,7 +694,6 @@ def main():
     parser.add_argument('-C', '--curveid', type=lambda x: int(x, 0), required=False)
     parser.add_argument('-c', '--command', type=str, required=False)
     parser.add_argument('-o', '--outdir', type=str, required=False, default='out')
-    parser.add_argument('--docker', action='store_true')
     parser.add_argument('--only-measure', action='store_true', default=False)
     parser.add_argument('--include-legacy', action='store_true', default=False)
     args = parser.parse_args()
