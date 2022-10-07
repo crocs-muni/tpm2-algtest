@@ -316,7 +316,13 @@ def get_tpm_id(detail_dir):
                     fw2 = val
                 elif line.startswith('TPM2_PT_VENDOR_STRING_'):
                     vendor_str += bytearray.fromhex(val).decode()
-            fw = str(int(fw1[0:4], 16)) + '.' + str(int(fw1[4:8], 16)) + '.' + str(int(fw2[0:4], 16)) + '.' + str(int(fw2[4:8], 16))
+            try:
+                fw1 = str(int(fw1[0:4], 16)) + '.' + str(int(fw1[4:8], 16)) if fw1.strip() else '?'
+                fw2 = str(int(fw2[0:4], 16)) + '.' + str(int(fw2[4:8], 16)) if fw2.strip() else '?'
+                fw = fw1 + '.' + fw2
+            except Exception as ex:
+                print('Error parsing firmware version: fw1:', fw1, ' fw2:', fw2)
+                raise ex
 
     manufacturer = manufacturer.replace('\0', '')
     vendor_str = vendor_str.replace('\0', '')
