@@ -10,7 +10,7 @@ Install [`tpm2-tools`](https://github.com/tpm2-software/tpm2-tools).
 
 Build `tpm2-algtest` tool:
 ```sh
-$ git clone https://github.com/dufkan/tpm2-algtest.git
+$ git clone https://github.com/crocs-muni/tpm2-algtest.git
 $ mkdir build
 $ cd build
 $ cmake .. && make
