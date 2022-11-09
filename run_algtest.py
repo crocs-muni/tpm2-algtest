@@ -281,11 +281,11 @@ def capability_handler(args):
     print('Running capability test...')
 
     for command in ("algorithms", "commands", "properties-fixed", "properties-variable", "ecc-curves", "handles-persistent"):
-            with open(os.path.join(detail_dir, f"Capability_{command}.txt"), 'w') as outfile:
-                try:
-                    subprocess.run(run_command + ["-c", command], stdout=outfile, stderr=subprocess.DEVNULL).check_returncode()
-                except:
-                    subprocess.run(run_command + [command], stdout=outfile).check_returncode()
+        with open(os.path.join(detail_dir, f"Capability_{command}.txt"), 'w') as outfile:
+            try:
+                subprocess.run(run_command + ["-c", command], stdout=outfile, stderr=subprocess.DEVNULL).check_returncode()
+            except:
+                subprocess.run(run_command + [command], stdout=outfile).check_returncode()
 
 
 def keygen_handler(args):
@@ -467,46 +467,46 @@ def compute_stats(infile):
 
 
 def write_results_file(results_file, detail_dir):
-        properties_path = os.path.join(detail_dir, 'Capability_properties-fixed.txt')
-        if os.path.isfile(properties_path):
-            results_file.write('\nCapability_properties-fixed\n')
-            with open(properties_path, 'r') as infile:
-                properties = ""
-                for line in infile:
-                    if line.startswith('  as UINT32:'):
-                        continue
-                    if line.startswith('  as string:'):
-                        line = line[line.find('"'):]
-                        properties = properties[:-1] + '\t' + line
-                    else:
-                        properties += line
-                results_file.write(properties)
+    properties_path = os.path.join(detail_dir, 'Capability_properties-fixed.txt')
+    if os.path.isfile(properties_path):
+        results_file.write('\nCapability_properties-fixed\n')
+        with open(properties_path, 'r') as infile:
+            properties = ""
+            for line in infile:
+                if line.startswith('  as UINT32:'):
+                    continue
+                if line.startswith('  as string:'):
+                    line = line[line.find('"'):]
+                    properties = properties[:-1] + '\t' + line
+                else:
+                    properties += line
+            results_file.write(properties)
 
-        algorithms_path = os.path.join(detail_dir, 'Capability_algorithms.txt')
-        if os.path.isfile(algorithms_path):
-            results_file.write('\nCapability_algorithms\n')
-            with open(algorithms_path, 'r') as infile:
-                for line in infile:
-                    if line.startswith('  value:'):
-                        line = line[line.find('0x'):]
-                        results_file.write(line)
+    algorithms_path = os.path.join(detail_dir, 'Capability_algorithms.txt')
+    if os.path.isfile(algorithms_path):
+        results_file.write('\nCapability_algorithms\n')
+        with open(algorithms_path, 'r') as infile:
+            for line in infile:
+                if line.startswith('  value:'):
+                    line = line[line.find('0x'):]
+                    results_file.write(line)
 
-        commands_path = os.path.join(detail_dir, 'Capability_commands.txt')
-        if os.path.isfile(commands_path):
-            results_file.write('\nCapability_commands\n')
-            with open(commands_path, 'r') as infile:
-                for line in infile:
-                    if line.startswith('  commandIndex:'):
-                        line = line[line.find('0x'):]
-                        results_file.write(line)
+    commands_path = os.path.join(detail_dir, 'Capability_commands.txt')
+    if os.path.isfile(commands_path):
+        results_file.write('\nCapability_commands\n')
+        with open(commands_path, 'r') as infile:
+            for line in infile:
+                if line.startswith('  commandIndex:'):
+                    line = line[line.find('0x'):]
+                    results_file.write(line)
 
-        curves_path = os.path.join(detail_dir, 'Capability_ecc-curves.txt')
-        if os.path.isfile(curves_path):
-            results_file.write('\nCapability_ecc-curves\n')
-            with open(curves_path, 'r') as infile:
-                for line in infile:
-                    line = line[line.find('(') + 1:line.find(')')]
-                    results_file.write(line + '\n')
+    curves_path = os.path.join(detail_dir, 'Capability_ecc-curves.txt')
+    if os.path.isfile(curves_path):
+        results_file.write('\nCapability_ecc-curves\n')
+        with open(curves_path, 'r') as infile:
+            for line in infile:
+                line = line[line.find('(') + 1:line.find(')')]
+                results_file.write(line + '\n')
 
 
 def write_perf_file(perf_file, detail_dir):
@@ -591,46 +591,46 @@ def write_legacy_header(file, detail_dir):
 
 
 def write_legacy_results_file(results_file, detail_dir):
-        properties_path = os.path.join(detail_dir, 'Capability_properties-fixed.txt')
-        if os.path.isfile(properties_path):
-            results_file.write('\nCapability_properties-fixed\n')
-            with open(properties_path, 'r') as infile:
-                properties = ""
-                for line in infile:
-                    if line.startswith('  as UINT32:'):
-                        continue
-                    if line.startswith('  as string:'):
-                        line = line[line.find('"'):]
-                        properties = properties[:-1] + '\t' + line
-                    else:
-                        properties += line.replace(':', ';')
-                results_file.write(properties)
+    properties_path = os.path.join(detail_dir, 'Capability_properties-fixed.txt')
+    if os.path.isfile(properties_path):
+        results_file.write('\nCapability_properties-fixed\n')
+        with open(properties_path, 'r') as infile:
+            properties = ""
+            for line in infile:
+                if line.startswith('  as UINT32:'):
+                    continue
+                if line.startswith('  as string:'):
+                    line = line[line.find('"'):]
+                    properties = properties[:-1] + '\t' + line
+                else:
+                    properties += line.replace(':', ';')
+            results_file.write(properties)
 
-        algorithms_path = os.path.join(detail_dir, 'Capability_algorithms.txt')
-        if os.path.isfile(algorithms_path):
-            results_file.write('\nCapability_algorithms\n')
-            with open(algorithms_path, 'r') as infile:
-                for line in infile:
-                    if line.startswith('  value:'):
-                        line = line[line.find('0x'):]
-                        results_file.write(line)
+    algorithms_path = os.path.join(detail_dir, 'Capability_algorithms.txt')
+    if os.path.isfile(algorithms_path):
+        results_file.write('\nCapability_algorithms\n')
+        with open(algorithms_path, 'r') as infile:
+            for line in infile:
+                if line.startswith('  value:'):
+                    line = line[line.find('0x'):]
+                    results_file.write(line)
 
-        commands_path = os.path.join(detail_dir, 'Capability_commands.txt')
-        if os.path.isfile(commands_path):
-            results_file.write('\nCapability_commands\n')
-            with open(commands_path, 'r') as infile:
-                for line in infile:
-                    if line.startswith('  commandIndex:'):
-                        line = line[line.find('0x'):]
-                        results_file.write(line)
+    commands_path = os.path.join(detail_dir, 'Capability_commands.txt')
+    if os.path.isfile(commands_path):
+        results_file.write('\nCapability_commands\n')
+        with open(commands_path, 'r') as infile:
+            for line in infile:
+                if line.startswith('  commandIndex:'):
+                    line = line[line.find('0x'):]
+                    results_file.write(line)
 
-        curves_path = os.path.join(detail_dir, 'Capability_ecc-curves.txt')
-        if os.path.isfile(curves_path):
-            results_file.write('\nCapability_ecc-curves\n')
-            with open(curves_path, 'r') as infile:
-                for line in infile:
-                    line = line[line.find('(') + 1:line.find(')')]
-                    results_file.write(line + '\n')
+    curves_path = os.path.join(detail_dir, 'Capability_ecc-curves.txt')
+    if os.path.isfile(curves_path):
+        results_file.write('\nCapability_ecc-curves\n')
+        with open(curves_path, 'r') as infile:
+            for line in infile:
+                line = line[line.find('(') + 1:line.find(')')]
+                results_file.write(line + '\n')
 
 
 def write_legacy_perf_file(perf_file, detail_dir):
