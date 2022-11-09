@@ -166,12 +166,14 @@ bool run_ecc_sign(
     rc = create(sapi_context, &inPublic, primary_handle, &outPublic, &outPrivate, NULL);
     if (rc != TPM2_RC_SUCCESS) {
         log_error("Cryptoops ecc: Error when creating signing key %04x", rc);
+        skip_progress(prog, scenario->parameters.repetitions);
         return false;
     }
 
     rc = load(sapi_context, primary_handle, &outPrivate, &outPublic, &object_handle);
     if (rc != TPM2_RC_SUCCESS) {
         log_error("Cryptoops ecc: Error when loading signing key %04x", rc);
+        skip_progress(prog, scenario->parameters.repetitions);
         return false;
     }
 
@@ -188,6 +190,8 @@ bool run_ecc_sign(
     for (unsigned i = 0; i < scenario->parameters.repetitions; ++i) {
         clock_gettime(CLOCK_MONOTONIC, &end);
         if (get_duration_s(&start, &end) > scenario->parameters.max_duration_s) {
+            log_error("Cryptoops ecc: Max duration reached. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i);
             break;
         }
 
@@ -316,12 +320,14 @@ bool run_rsa_sign(
     rc = create(sapi_context, &inPublic, primary_handle, &outPublic, &outPrivate, NULL);
     if (rc != TPM2_RC_SUCCESS) {
         log_error("Cryptoops rsa: Error when creating signing key %04x", rc);
+        skip_progress(prog, scenario->parameters.repetitions);
         return false;
     }
 
     rc = load(sapi_context, primary_handle, &outPrivate, &outPublic, &object_handle);
     if (rc != TPM2_RC_SUCCESS) {
         log_error("Cryptoops rsa: Error when loading signing key %04x", rc);
+        skip_progress(prog, scenario->parameters.repetitions);
         return false;
     }
 
@@ -339,6 +345,8 @@ bool run_rsa_sign(
     for (unsigned i = 0; i < scenario->parameters.repetitions; ++i) {
         clock_gettime(CLOCK_MONOTONIC, &end);
         if (get_duration_s(&start, &end) > scenario->parameters.max_duration_s) {
+            log_error("Cryptoops rsa: Max duration reached. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i);
             break;
         }
 

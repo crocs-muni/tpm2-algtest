@@ -143,6 +143,7 @@ bool run_perf_sign(
     rc = create_loaded(sapi_context, &inPublic, primary_handle, &object_handle);
     if (rc != TPM2_RC_SUCCESS) {
         log_error("Perf sign: Error when creating signing key %04x", rc);
+        skip_progress(prog, scenario->parameters.repetitions);
         return false;
     }
 
@@ -154,6 +155,8 @@ bool run_perf_sign(
     for (unsigned i = 0; i < scenario->parameters.repetitions; ++i) {
         clock_gettime(CLOCK_MONOTONIC, &end);
         if (get_duration_s(&start, &end) > scenario->parameters.max_duration_s) {
+            log_error("Perf sign: Max duration reached. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i);
             break;
         }
 
@@ -216,6 +219,7 @@ bool run_perf_verifysignature(
     rc = create_loaded(sapi_context, &inPublic, primary_handle, &object_handle);
     if (rc != TPM2_RC_SUCCESS) {
         log_error("Perf verifysignature: Error when creating signing key %04x", rc);
+        skip_progress(prog, scenario->parameters.repetitions);
         return false;
     }
 
@@ -231,6 +235,7 @@ bool run_perf_verifysignature(
         } else {
             log_error("Perf verifysignature: Could not create signature type %04x | scheme %04x | rc %04x", scenario->verifysignature.key_params.type, scenario->verifysignature.scheme.scheme, rc);
         }
+        skip_progress(prog, scenario->parameters.repetitions);
         Tss2_Sys_FlushContext(sapi_context, object_handle);
         return false;
     }
@@ -243,6 +248,8 @@ bool run_perf_verifysignature(
     for (unsigned i = 0; i < scenario->parameters.repetitions; ++i) {
         clock_gettime(CLOCK_MONOTONIC, &end);
         if (get_duration_s(&start, &end) > scenario->parameters.max_duration_s) {
+            log_error("Perf verifysignature: Max duration reached. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i);
             break;
         }
 
@@ -298,6 +305,7 @@ bool run_perf_rsa_encrypt(
     rc = create_loaded(sapi_context, &inPublic, primary_handle, &object_handle);
     if (rc != TPM2_RC_SUCCESS) {
         log_error("Perf rsa_encrypt: Error when creating encryption key %04x", rc);
+        skip_progress(prog, scenario->parameters.repetitions);
         return false;
     }
 
@@ -309,6 +317,8 @@ bool run_perf_rsa_encrypt(
     for (unsigned i = 0; i < scenario->parameters.repetitions; ++i) {
         clock_gettime(CLOCK_MONOTONIC, &end);
         if (get_duration_s(&start, &end) > scenario->parameters.max_duration_s) {
+            log_error("Perf rsa_encrypt: Max duration reached. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i);
             break;
         }
 
@@ -356,6 +366,7 @@ bool run_perf_rsa_decrypt(
     rc = create_loaded(sapi_context, &inPublic, primary_handle, &object_handle);
     if (rc != TPM2_RC_SUCCESS) {
         log_error("Perf rsa_decrypt: Error when creating encryption key %04x", rc);
+        skip_progress(prog, scenario->parameters.repetitions);
         return false;
     }
 
@@ -371,6 +382,8 @@ bool run_perf_rsa_decrypt(
     for (unsigned i = 0; i < scenario->parameters.repetitions; ++i) {
         clock_gettime(CLOCK_MONOTONIC, &end);
         if (get_duration_s(&start, &end) > scenario->parameters.max_duration_s) {
+            log_error("Perf rsa_decrypt: Max duration reached. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i);
             break;
         }
 
@@ -429,6 +442,7 @@ bool run_perf_encryptdecrypt(
     rc = create_loaded(sapi_context, &inPublic, primary_handle, &object_handle);
     if (rc != TPM2_RC_SUCCESS) {
         log_error("Perf encryptdecrypt: Error when creating key %04x", rc);
+        skip_progress(prog, scenario->parameters.repetitions);
         return false;
     }
 
@@ -454,6 +468,8 @@ bool run_perf_encryptdecrypt(
     for (unsigned i = 0; i < scenario->parameters.repetitions; ++i) {
         clock_gettime(CLOCK_MONOTONIC, &end);
         if (get_duration_s(&start, &end) > scenario->parameters.max_duration_s) {
+            log_error("Perf encryptdecrypt: Max duration reached. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i);
             break;
         }
 
@@ -516,6 +532,7 @@ bool run_perf_hmac(
     rc = create_loaded(sapi_context, &inPublic, primary_handle, &object_handle);
     if (rc != TPM2_RC_SUCCESS) {
         log_error("Perf hmac: Error when creating HMAC key %04x", rc);
+        skip_progress(prog, scenario->parameters.repetitions);
         return false;
     }
 
@@ -530,6 +547,8 @@ bool run_perf_hmac(
     for (unsigned i = 0; i < scenario->parameters.repetitions; ++i) {
         clock_gettime(CLOCK_MONOTONIC, &end);
         if (get_duration_s(&start, &end) > scenario->parameters.max_duration_s) {
+            log_error("Perf hmac: Max duration reached. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i);
             break;
         }
 
@@ -578,6 +597,7 @@ bool run_perf_zgen(
     rc = create_loaded(sapi_context, &inPublic, primary_handle, &object_handle);
     if (rc != TPM2_RC_SUCCESS) {
         log_error("Perf zgen: Error when creating static key %04x", rc);
+        skip_progress(prog, scenario->parameters.repetitions);
         Tss2_Sys_FlushContext(sapi_context, object_handle);
         return false;
     }
@@ -590,6 +610,8 @@ bool run_perf_zgen(
     for (unsigned i = 0; i < scenario->parameters.repetitions; ++i) {
         clock_gettime(CLOCK_MONOTONIC, &end);
         if (get_duration_s(&start, &end) > scenario->parameters.max_duration_s) {
+            log_error("Perf zgen: Max duration reached. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i);
             break;
         }
 
@@ -696,6 +718,8 @@ void run_perf_getrandom(
     for (unsigned i = 0; i < scenario->parameters.repetitions; ++i) {
         clock_gettime(CLOCK_MONOTONIC, &end);
         if (get_duration_s(&start, &end) > scenario->parameters.max_duration_s) {
+            log_error("Perf getrandom: Max duration reached. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i);
             break;
         }
 
@@ -748,6 +772,8 @@ void run_perf_hash(
     for (unsigned i = 0; i < scenario->parameters.repetitions; ++i) {
         clock_gettime(CLOCK_MONOTONIC, &end);
         if (get_duration_s(&start, &end) > scenario->parameters.max_duration_s) {
+            log_error("Perf hash: Max duration reached. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i);
             break;
         }
 
