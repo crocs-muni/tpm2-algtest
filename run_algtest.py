@@ -8,6 +8,7 @@ import csv
 import datetime
 import hashlib
 import math
+import re
 
 DEVICE = '/dev/tpm0'
 IMAGE_TAG = 'v2.0'
@@ -173,6 +174,60 @@ def compute_nonce(filename):
             writer.writerow(row)
 
 
+def check_nonce_points(data_filename, log_filename):
+    curve = data_filename.split(":")[1].split("_")[1][2:]
+
+    log_nonce_points = {}
+    with open(log_filename, "r") as f:
+        log_lines = f.readlines()
+
+    for i, line in enumerate(log_lines):
+        if i + 1 >= len(log_lines):
+            break
+        next_line = log_lines[i + 1]
+
+        if "Unexpected point output" in line and (match := re.search(f"Cryptoops ecc (\\d+): \\| scheme 001a \\| curve {curve}", next_line)):
+            idx = int(match.groups()[0])
+
+            point = line.split()[-1]
+            if len(point) < 2 or point[:2] != "04":
+                print("Could not extract a point from the log")
+                continue
+
+            coord_len = (len(point) - 2) // 2
+            log_nonce_points[idx] = (point[2:2 + coord_len], point[2 + coord_len:])
+
+    def compute_row(row):
+        try:
+            if row["nonce_point_x"] == "" or row["nonce_point_y"] == "":
+                idx = int(row["id"])
+                row["nonce_point_x"] = log_nonce_points[idx][0]
+                row["nonce_point_y"] = log_nonce_points[idx][1]
+        except:
+            return False
+        return True
+
+    rows = []
+    with open(data_filename) as infile:
+        reader = csv.DictReader(infile, delimiter=',')
+        for row in reader:
+            rows.append(row)
+
+    failed = 0
+    for row in rows:
+        failed += 0 if compute_row(row) else 1
+
+    if failed > 0:
+        print(f"Computation of {failed} rows failed")
+
+    with open(data_filename, 'w') as outfile:
+        writer = csv.DictWriter(
+                outfile, delimiter=',', fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)
+
+
 def get_tpm_id(detail_dir):
     def get_val(line):
         pos = line.find('0x')
@@ -324,6 +379,11 @@ def cryptoops_handler(args):
         run_algtest(run_command, logfile)
 
     if not args.only_measure:
+        print('Checking file consistency...')
+        for filename in glob.glob(os.path.join(detail_dir, 'Cryptoops_Sign:ECC_*_0x001a.csv')):
+            print(filename)
+            check_nonce_points(filename, os.path.join(detail_dir, "cryptoops_log.txt"))
+
         print('Computing ECC nonces...')
         for filename in glob.glob(os.path.join(detail_dir, 'Cryptoops_Sign:ECC_*.csv')):
             print(filename)
@@ -356,6 +416,11 @@ def format_handler(args):
             create_legacy_result_files(args.outdir)
 
         create_result_files(args.outdir)
+
+        print('Checking file consistency...')
+        for filename in glob.glob(os.path.join(detail_dir, 'Cryptoops_Sign:ECC_*_0x001a.csv')):
+            print(filename)
+            check_nonce_points(filename, os.path.join(detail_dir, "cryptoops_log.txt"))
 
         print('Computing ECC nonces...')
         for filename in glob.glob(os.path.join(detail_dir, 'Cryptoops_Sign:ECC_*.csv')):
