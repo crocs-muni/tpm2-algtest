@@ -59,6 +59,8 @@ void run_rng_getrandom(
     for (unsigned i = 0; i < scenario->parameters.repetitions; ++i) {
         clock_gettime(CLOCK_MONOTONIC, &end);
         if (get_duration_s(&start, &end) > scenario->parameters.max_duration_s) {
+            log_error("Rng: Max duration reached. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i);
             break;
         }
 
