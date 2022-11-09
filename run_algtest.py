@@ -11,7 +11,7 @@ import math
 import re
 
 DEVICE = '/dev/tpm0'
-IMAGE_TAG = 'v2.0'
+IMAGE_TAG = 'v2.1'
 
 
 def run_algtest(run_command, logfile):
