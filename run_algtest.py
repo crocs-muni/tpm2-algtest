@@ -335,6 +335,9 @@ def capability_handler(args):
 
     print('Running capability test...')
 
+    with open(os.path.join(detail_dir, "Capability_pcrread.txt"), 'w') as outfile:
+        subprocess.run(['tpm2_pcrread'], stdout=outfile).check_returncode()
+
     for command in ("algorithms", "commands", "properties-fixed", "properties-variable", "ecc-curves", "handles-persistent"):
         with open(os.path.join(detail_dir, f"Capability_{command}.txt"), 'w') as outfile:
             try:
