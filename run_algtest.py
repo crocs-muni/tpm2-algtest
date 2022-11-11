@@ -9,6 +9,7 @@ import datetime
 import hashlib
 import math
 import re
+import unicodedata
 
 DEVICE = '/dev/tpm0'
 IMAGE_TAG = 'v2.1'
@@ -42,6 +43,10 @@ def zip(outdir):
     for root, _, files in os.walk(outdir):
         for file in files:
             zipf.write(os.path.join(root, file))
+
+
+def remove_control_chars(string):
+    return "".join(filter(lambda x: x == '\n' or unicodedata.category(x)[0] != "C", string))
 
 
 def compute_rsa_privates(filename):
@@ -262,8 +267,9 @@ def get_tpm_id(detail_dir):
 
             fw = str(int(fw1[0:4], 16)) + '.' + str(int(fw1[4:8], 16)) + '.' + str(int(fw2[0:4], 16)) + '.' + str(int(fw2[4:8], 16))
 
-    manufacturer = manufacturer.replace('\0', '')
-    vendor_str = vendor_str.replace('\0', '')
+    manufacturer = remove_control_chars(manufacturer)
+    vendor_str = remove_control_chars(vendor_str)
+    fw = remove_control_chars(fw)
     return manufacturer, vendor_str, fw
 
 
@@ -537,7 +543,7 @@ def compute_stats(infile):
 def write_results_file(results_file, detail_dir):
     properties_path = os.path.join(detail_dir, 'Capability_properties-fixed.txt')
     if os.path.isfile(properties_path):
-        results_file.write('\nCapability_properties-fixed\n')
+        results_file.write('\nCapability_properties-fixed:\n')
         with open(properties_path, 'r') as infile:
             properties = ""
             for line in infile:
@@ -547,92 +553,95 @@ def write_results_file(results_file, detail_dir):
                     line = line[line.find('"'):]
                     properties = properties[:-1] + '\t' + line
                 else:
-                    properties += line
-            results_file.write(properties)
+                    properties += "  " + line
+            results_file.write(remove_control_chars(properties))
 
     algorithms_path = os.path.join(detail_dir, 'Capability_algorithms.txt')
     if os.path.isfile(algorithms_path):
-        results_file.write('\nCapability_algorithms\n')
+        results_file.write('\nCapability_algorithms:\n')
         with open(algorithms_path, 'r') as infile:
             for line in infile:
                 if line.startswith('  value:'):
                     line = line[line.find('0x'):]
-                    results_file.write(line)
+                    results_file.write("- " + line)
 
     commands_path = os.path.join(detail_dir, 'Capability_commands.txt')
     if os.path.isfile(commands_path):
-        results_file.write('\nCapability_commands\n')
+        results_file.write('\nCapability_commands:\n')
         with open(commands_path, 'r') as infile:
             for line in infile:
                 if line.startswith('  commandIndex:'):
                     line = line[line.find('0x'):]
-                    results_file.write(line)
+                    results_file.write("- " + line)
 
     curves_path = os.path.join(detail_dir, 'Capability_ecc-curves.txt')
     if os.path.isfile(curves_path):
-        results_file.write('\nCapability_ecc-curves\n')
+        results_file.write('\nCapability_ecc-curves:\n')
         with open(curves_path, 'r') as infile:
             for line in infile:
                 line = line[line.find('(') + 1:line.find(')')]
-                results_file.write(line + '\n')
+                results_file.write("  " + line + '\n')
 
 
 def write_perf_file(perf_file, detail_dir):
     perf_csvs = glob.glob(os.path.join(detail_dir, 'Perf_*.csv'))
     perf_csvs.sort()
+    prev_command, command = None, None
     for filepath in perf_csvs:
         filename = os.path.basename(filepath)
         params_idx = filename.find(':')
         suffix_idx = filename.find('.csv')
-        command = filename[5:suffix_idx if params_idx == -1 else params_idx]
+        prev_command, command = command, filename[5:suffix_idx if params_idx == -1 else params_idx]
         params = filename[params_idx+1:suffix_idx].split('_')
 
-        perf_file.write('TPM2_' + command + ':\n')
+        if prev_command != command:
+            perf_file.write('\nTPM2_' + command + ':\n')
+
         if command == 'GetRandom':
-            perf_file.write('  data length (bytes): 32\n')
+            perf_file.write('- data length (bytes): 32\n')
         elif command in ('Sign', 'VerifySignature', 'RSA_Encrypt', 'RSA_Decrypt'):
-            perf_file.write(f'  key parameters: {params[0]} {params[1]}\n')
+            perf_file.write(f'- key parameters: {params[0]} {params[1]}\n')
             perf_file.write(f'  scheme: {params[2]}\n')
         elif command == 'EncryptDecrypt':
-            perf_file.write(f'  algorithm: {params[0]}\n')
+            perf_file.write(f'- algorithm: {params[0]}\n')
             perf_file.write(f'  key length: {params[1]}\n')
             perf_file.write(f'  mode: {params[2]}\n')
             perf_file.write(f'  encrypt/decrypt?: {params[3]}\n')
             perf_file.write('  data length (bytes): 256\n')
         elif command == 'HMAC':
-            perf_file.write('  hash algorithm: SHA-256\n')
+            perf_file.write('- hash algorithm: SHA-256\n')
             perf_file.write('  data length (bytes): 256\n')
         elif command == 'Hash':
-            perf_file.write(f'  hash algorithm: {params[0]}\n')
+            perf_file.write(f'- hash algorithm: {params[0]}\n')
             perf_file.write('  data length (bytes): 256\n')
         elif command == 'ZGen':
-            perf_file.write(f'  key parameters: {params[0]}\n')
+            perf_file.write(f'- key parameters: {params[0]}\n')
             perf_file.write(f'  scheme: {params[1]}\n')
         else:
-            perf_file.write(f'  key parameters: {" ".join(params)}\n')
+            perf_file.write(f'- key parameters: {" ".join(params)}\n')
 
         with open(filepath, 'r') as infile:
             avg_op, min_op, max_op, total, success, fail, error = compute_stats(infile)
-            perf_file.write(f'Operation stats (ms/op):\n')
-            perf_file.write(f'  avg op: {avg_op:.2f}\n')
-            perf_file.write(f'  min op: {min_op:.2f}\n')
-            perf_file.write(f'  max op: {max_op:.2f}\n')
-            perf_file.write(f'Operation info:\n')
-            perf_file.write(f'  total iterations: {total}\n')
-            perf_file.write(f'  successful: {success}\n')
-            perf_file.write(f'  failed: {fail}\n')
-            perf_file.write(f'  error: {"None" if not error else error}\n\n')
+            perf_file.write(f'  operation stats (ms/op):\n')
+            perf_file.write(f'    avg op: {avg_op:.2f}\n')
+            perf_file.write(f'    min op: {min_op:.2f}\n')
+            perf_file.write(f'    max op: {max_op:.2f}\n')
+            perf_file.write(f'  operation info:\n')
+            perf_file.write(f'    total iterations: {total}\n')
+            perf_file.write(f'    successful: {success}\n')
+            perf_file.write(f'    failed: {fail}\n')
+            perf_file.write(f'    error: {"None" if not error else error}\n')
 
 
 def create_result_files(outdir):
     detail_dir = os.path.join(outdir, 'detail')
     manufacturer, vendor_str, fw = get_tpm_id(detail_dir)
 
-    with open(os.path.join(outdir, "results.txt"), 'w') as results_file:
+    with open(os.path.join(outdir, "results.yaml"), 'w') as results_file:
         write_header(results_file, detail_dir)
         write_results_file(results_file, detail_dir)
 
-    with open(os.path.join(outdir, 'performance.txt'), 'w') as perf_file:
+    with open(os.path.join(outdir, 'performance.yaml'), 'w') as perf_file:
         write_header(perf_file, detail_dir)
         write_perf_file(perf_file, detail_dir)
 
