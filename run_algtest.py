@@ -10,6 +10,11 @@ import hashlib
 import math
 import re
 import unicodedata
+import binascii
+
+from cryptography.hazmat.primitives.serialization import load_pem_public_key, PublicFormat, Encoding
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
+from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicKey
 
 DEVICE = '/dev/tpm0'
 IMAGE_TAG = 'v2.1'
@@ -317,6 +322,56 @@ def get_image_tag(detail_dir):
     return image_tag
 
 
+def get_anonymized_cert(cert_path):
+    process = subprocess.run(['openssl', 'x509', '-in', cert_path, '-noout', '-text'], capture_output=True)
+    process.check_returncode()
+    data = process.stdout.decode().split("\n")
+    anonymize_depth = None
+
+    output = ""
+    for line in data:
+        depth = 0
+        for c in line:
+            if c != ' ':
+                break
+            depth += 1
+
+        if anonymize_depth is None and "Modulus" in line or "pub" in line or "Serial Number" in line:
+            anonymize_depth = depth
+            output += line + "\n"
+            continue
+
+        if anonymize_depth and depth > anonymize_depth:
+            output += "".join(map(lambda x: x if x in " :" else "X", line)) + "\n"
+            continue
+
+        output += line + "\n"
+        anonymize_depth = None
+
+    return output
+
+
+def get_anonymized_ecc(cert_path):
+    process = subprocess.run(['openssl', 'x509', '-in', cert_path, '-noout', '-pubkey'], capture_output=True)
+    process.check_returncode()
+    data = process.stdout
+    key = load_pem_public_key(data)
+    assert isinstance(key, EllipticCurvePublicKey)
+    point = binascii.hexlify(key.public_bytes(Encoding.X962, PublicFormat.CompressedPoint)).decode()
+    return f"Anonymized:\n  pub prefix: {point[:6]}\n  pub suffix: {point[-4:]}\n"
+
+
+def get_anonymized_rsa(cert_path):
+    process = subprocess.run(['openssl', 'x509', '-in', cert_path, '-noout', '-pubkey'], capture_output=True)
+    process.check_returncode()
+    data = process.stdout
+    key = load_pem_public_key(data)
+    assert isinstance(key, RSAPublicKey)
+    n = key.public_numbers().n
+    n = binascii.hexlify(int.to_bytes(n, length=(math.floor(math.log2(n)) // 8) + 1, byteorder="big")).decode()
+    return f"Anonymized:\n  n prefix: {n[:4]}\n  n suffix: {n[-4:]}\n"
+
+
 def system_info(detail_dir):
     with open(os.path.join(detail_dir, 'image_tag.txt'), 'w') as f:
         f.write(IMAGE_TAG)
@@ -340,6 +395,28 @@ def capability_handler(args):
     run_command = ['sudo', 'tpm2_getcap', '-T', 'device']
 
     print('Running capability test...')
+
+    with open(os.path.join(detail_dir, "Capability_pcrread.txt"), 'w') as outfile:
+        subprocess.run(['tpm2_pcrread'], stdout=outfile)
+
+    # Get anonymized endorsement certificates
+    subprocess.run(['tpm2_getekcertificate', '-o', 'ek-rsa.cer', '-o', 'ek-ecc.cer'], stdout=subprocess.DEVNULL)
+    try:
+        anonymized_rsa = get_anonymized_rsa("ek-rsa.cer")
+        anonymized_cert = get_anonymized_cert("ek-rsa.cer")
+        with open(os.path.join(detail_dir, "Capability_ek-rsa.txt"), "w") as outfile:
+            outfile.write(anonymized_rsa + anonymized_cert)
+    except:
+        print("Could not obtain RSA endorsement certificate")
+
+    try:
+        anonymized_ecc = get_anonymized_ecc("ek-ecc.cer")
+        anonymized_cert = get_anonymized_cert("ek-ecc.cer")
+        with open(os.path.join(detail_dir, "Capability_ek-ecc.txt"), "w") as outfile:
+            outfile.write(anonymized_ecc + anonymized_cert)
+    except:
+        print("Could not obtain ECC endorsement certificate")
+    subprocess.run(['rm', '-f', 'ek-rsa.cer', 'ek-ecc.cer'], stdout=subprocess.DEVNULL)
 
     with open(os.path.join(detail_dir, "Capability_pcrread.txt"), 'w') as outfile:
         subprocess.run(['tpm2_pcrread'], stdout=outfile).check_returncode()
@@ -622,11 +699,11 @@ def write_perf_file(perf_file, detail_dir):
 
         with open(filepath, 'r') as infile:
             avg_op, min_op, max_op, total, success, fail, error = compute_stats(infile)
-            perf_file.write(f'  operation stats (ms/op):\n')
+            perf_file.write('  operation stats (ms/op):\n')
             perf_file.write(f'    avg op: {avg_op:.2f}\n')
             perf_file.write(f'    min op: {min_op:.2f}\n')
             perf_file.write(f'    max op: {max_op:.2f}\n')
-            perf_file.write(f'  operation info:\n')
+            perf_file.write('  operation info:\n')
             perf_file.write(f'    total iterations: {total}\n')
             perf_file.write(f'    successful: {success}\n')
             perf_file.write(f'    failed: {fail}\n')
