@@ -51,28 +51,26 @@ TPM2_RC sign(
                 &inSchemeCopy.details.ecdaa.count,
                 &rspAuthsArray);
 
-        if(K.size > 4 && K.point.x.size < 512 && K.point.y.size < 512) {
-            char point[1024];
-            char* ptr = point;
-            ptr += sprintf(ptr, "04");
+        if(K.size > 4 && K.point.x.size < 256 && K.point.y.size < 256) {
+            char point[1024] = {'0', '4'};
+            char* ptr = point + 2;
             for(int i = 0; i < K.point.x.size; ++i) {
-                ptr += sprintf(ptr, "%02x", K.point.x.buffer[i]);
+                ptr += sprintf(ptr, "%02x", K.point.x.buffer[i]) == 2 ? 2 : 0;
             }
             for(int i = 0; i < K.point.y.size; ++i) {
-                ptr += sprintf(ptr, "%02x", K.point.y.buffer[i]);
+                ptr += sprintf(ptr, "%02x", K.point.y.buffer[i]) == 2 ? 2 : 0;
             }
             log_warning("Unexpected point output in TPM2_Commit: K %s", point);
         }
 
-        if(L.size > 4 && L.point.x.size < 512 && L.point.y.size < 512) {
-            char point[1024];
-            char* ptr = point;
-            ptr += sprintf(ptr, "04");
+        if(L.size > 4 && L.point.x.size < 256 && L.point.y.size < 256) {
+            char point[1024] = {'0', '4'};
+            char* ptr = point + 2;
             for(int i = 0; i < L.point.x.size; ++i) {
-                ptr += sprintf(ptr, "%02x", L.point.x.buffer[i]);
+                ptr += sprintf(ptr, "%02x", L.point.x.buffer[i]) == 2 ? 2 : 0;
             }
             for(int i = 0; i < L.point.y.size; ++i) {
-                ptr += sprintf(ptr, "%02x", L.point.y.buffer[i]);
+                ptr += sprintf(ptr, "%02x", L.point.y.buffer[i]) == 2 ? 2 : 0;
             }
             log_warning("Unexpected point output in TPM2_Commit: L %s", point);
         }
