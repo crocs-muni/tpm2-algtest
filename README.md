@@ -6,7 +6,7 @@ This project uses sources from [tpm2-tools](https://github.com/tpm2-software/tpm
 
 ## Running the tool
 
-Install [`tpm2-tools`](https://github.com/tpm2-software/tpm2-tools).
+Install [`tpm2-tools`](https://github.com/tpm2-software/tpm2-tools) and `openssl`.
 
 Build `tpm2-algtest` tool:
 ```sh
@@ -15,6 +15,13 @@ $ mkdir build
 $ cd build
 $ cmake .. && make
 $ cd ..
+```
+
+Install requirements (and optionally use venv):
+```sh
+$ python -m venv venv
+$ source venv/bin/activate
+$ pip install -r requirements.txt
 ```
 
 Run `run_algtest.py`:
