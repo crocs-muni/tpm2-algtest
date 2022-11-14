@@ -329,6 +329,7 @@ def get_anonymized_cert(cert_path):
     anonymize_depth = None
 
     output = ""
+    anonymized = 0
     for line in data:
         depth = 0
         for c in line:
@@ -336,7 +337,8 @@ def get_anonymized_cert(cert_path):
                 break
             depth += 1
 
-        if anonymize_depth is None and "Modulus" in line or "pub" in line or "Serial Number" in line:
+        if anonymize_depth is None and "Modulus" in line or "pub" in line or "Serial Number" in line or "Subject Alternative Name" in line or "Signature Value" in line:
+            anonymized += 1
             anonymize_depth = depth
             output += line + "\n"
             continue
@@ -348,7 +350,7 @@ def get_anonymized_cert(cert_path):
         output += line + "\n"
         anonymize_depth = None
 
-    return output
+    return output if anonymized >= 3 else ""
 
 
 def get_anonymized_ecc(cert_path):
