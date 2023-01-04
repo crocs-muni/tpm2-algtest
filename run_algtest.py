@@ -380,9 +380,10 @@ def get_anonymized_rsa(cert_path):
     return f"Anonymized:\n  n prefix: {n[:4]}\n  n suffix: {n[-4:]}\n"
 
 
-def system_info(detail_dir):
+def system_info(args, detail_dir):
     with open(os.path.join(detail_dir, 'image_tag.txt'), 'w') as f:
-        f.write(IMAGE_TAG)
+        f.write(args.with_image_tag)
+        print("Version tag:", args.with_image_tag)
 
     try:
         result = subprocess.run("sudo -n dmidecode -s bios-version", stdout=subprocess.PIPE, shell=True)
@@ -862,6 +863,7 @@ def main():
     parser.add_argument('-C', '--curveid', type=lambda x: int(x, 0), required=False)
     parser.add_argument('-c', '--command', type=str, required=False)
     parser.add_argument('-o', '--outdir', type=str, required=False, default='out')
+    parser.add_argument('--with-image-tag', type=str, required=False, default=IMAGE_TAG)
     parser.add_argument('--only-measure', action='store_true', default=False)
     parser.add_argument('--include-legacy', action='store_true', default=False)
     parser.add_argument('--machine-readable-statuses', action='store_true', default=False)
