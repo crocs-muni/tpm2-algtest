@@ -20,6 +20,12 @@ DEVICE = '/dev/tpm0'
 IMAGE_TAG = 'v2.1'
 
 
+def set_status(args, status):
+    if args.machine_readable_statuses:
+        status = f"+++{status}+++"
+    print(status)
+
+
 def run_algtest(run_command, logfile):
     proc = subprocess.Popen(run_command, stdout=subprocess.PIPE, universal_newlines=True)
     for line in proc.stdout:
@@ -396,8 +402,6 @@ def capability_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
     run_command = ['sudo', 'tpm2_getcap', '-T', 'device']
 
-    print('Running capability test...')
-
     with open(os.path.join(detail_dir, "Capability_pcrread.txt"), 'w') as outfile:
         subprocess.run(['tpm2_pcrread'], stdout=outfile)
 
@@ -436,12 +440,11 @@ def keygen_handler(args):
     run_command = ['sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir, '-T', 'device', '-s', 'keygen']
     add_args(run_command, args)
 
-    print('Running keygen test...')
     with open(os.path.join(detail_dir, 'keygen_log.txt'), 'w') as logfile:
         run_algtest(run_command, logfile)
 
     if not args.only_measure:
-        print('Computing RSA private keys...')
+        set_status(args, 'Computing RSA private keys...')
         for filename in glob.glob(os.path.join(detail_dir, 'Keygen:RSA_*.csv')):
             print(filename)
             compute_rsa_privates(filename)
@@ -452,7 +455,6 @@ def perf_handler(args):
     run_command = ['sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir, '-T', 'device', '-s', 'perf']
     add_args(run_command, args)
 
-    print('Running perf test...')
     with open(os.path.join(detail_dir, 'perf_log.txt'), 'w') as logfile:
         run_algtest(run_command, logfile)
 
@@ -462,7 +464,6 @@ def cryptoops_handler(args):
     run_command = ['sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir, '-T', 'device', '-s', 'cryptoops']
     add_args(run_command, args)
 
-    print('Running cryptoops test...')
     with open(os.path.join(detail_dir, 'cryptoops_log.txt'), 'w') as logfile:
         run_algtest(run_command, logfile)
 
@@ -472,12 +473,12 @@ def cryptoops_handler(args):
             print(filename)
             check_nonce_points(filename, os.path.join(detail_dir, "cryptoops_log.txt"))
 
-        print('Computing ECC nonces...')
+        set_status(args, 'Computing ECC nonces...')
         for filename in glob.glob(os.path.join(detail_dir, 'Cryptoops_Sign:ECC_*.csv')):
             print(filename)
             compute_nonce(filename)
 
-        print('Computing RSA privates...')
+        set_status(args, 'Computing RSA privates...')
         for filename in glob.glob(os.path.join(detail_dir, 'Cryptoops_Sign:RSA_*.csv')):
             print(filename)
             compute_rsa_privates(filename)
@@ -488,7 +489,6 @@ def rng_handler(args):
     run_command = ['sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir, '-T', 'device', '-s', 'rng']
     add_args(run_command, args)
 
-    print('Running rng test...')
     with open(os.path.join(detail_dir, 'rng_log.txt'), 'w') as logfile:
         run_algtest(run_command, logfile)
 
@@ -496,7 +496,7 @@ def rng_handler(args):
 def format_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
     if len(os.listdir(detail_dir)) == 0:
-        print('There is no output yet, need to run tests.')
+        set_status(args, 'There is no output yet, need to run tests.')
         return
 
     if not args.only_measure:
@@ -505,38 +505,44 @@ def format_handler(args):
 
         create_result_files(args.outdir)
 
-        print('Checking file consistency...')
+        set_status(args, 'Checking file consistency...')
         for filename in glob.glob(os.path.join(detail_dir, 'Cryptoops_Sign:ECC_*_0x001a.csv')):
             print(filename)
             check_nonce_points(filename, os.path.join(detail_dir, "cryptoops_log.txt"))
 
-        print('Computing ECC nonces...')
+        set_status(args, 'Computing ECC nonces...')
         for filename in glob.glob(os.path.join(detail_dir, 'Cryptoops_Sign:ECC_*.csv')):
             print(filename)
             compute_nonce(filename)
 
-        print('Computing RSA privates...')
+        set_status(args, 'Computing RSA privates...')
         for filename in glob.glob(os.path.join(detail_dir, 'Cryptoops_Sign:RSA_*.csv')):
             print(filename)
             compute_rsa_privates(filename)
 
 
 def all_handler(args):
-    print("Running all tests...")
-    system_info(os.path.join(args.outdir, 'detail'))
+    handlers_count = 5
+    set_status(args, 'Running all tests...')
+    system_info(args, os.path.join(args.outdir, 'detail'))
+    set_status(args, f'Collecting basic TPM info (1/{handlers_count})...')
     capability_handler(args)
     default_num = args.num is None
     if default_num:
         args.num = 1000
+    set_status(args, f'Running cryptoops test (2/{handlers_count})...')
     cryptoops_handler(args)
     if default_num:
         args.num = 16384
+    set_status(args, f'Running RNG test (3/{handlers_count})...')
     rng_handler(args)
     if default_num:
         args.num = 1000
+    set_status(args, f'Running performance test (4/{handlers_count})...')
     perf_handler(args)
     if default_num:
         args.num = 1000
+    set_status(args, f'Running keygen test (5/{handlers_count})...')
     keygen_handler(args)
     if default_num:
         args.num = None
@@ -548,21 +554,27 @@ def all_handler(args):
 
 
 def extensive_handler(args):
-    print("Running all tests with extensive setting...")
-    system_info(os.path.join(args.outdir, 'detail'))
+    handlers_count = 5
+    set_status(args, 'Running all tests with extensive setting...')
+    system_info(args, os.path.join(args.outdir, 'detail'))
+    set_status(args, f'Collecting basic TPM info (1/{handlers_count})...')
     capability_handler(args)
     default_num = args.num is None
     if default_num:
         args.num = 100000
+    set_status(args, f'Running cryptoops test (2/{handlers_count})...')
     cryptoops_handler(args)
     if default_num:
         args.num = 524288
+    set_status(args, f'Running RNG test (3/{handlers_count})...')
     rng_handler(args)
     if default_num:
         args.num = 1000
+    set_status(args, f'Running performance test (4/{handlers_count})...')
     perf_handler(args)
     if default_num:
         args.num = 100000
+    set_status(args, f'Running keygen test (5/{handlers_count})...')
     keygen_handler(args)
     if default_num:
         args.num = None
@@ -852,6 +864,7 @@ def main():
     parser.add_argument('-o', '--outdir', type=str, required=False, default='out')
     parser.add_argument('--only-measure', action='store_true', default=False)
     parser.add_argument('--include-legacy', action='store_true', default=False)
+    parser.add_argument('--machine-readable-statuses', action='store_true', default=False)
     args = parser.parse_args()
 
     if not os.path.exists(DEVICE):
@@ -874,8 +887,10 @@ def main():
     if args.test in COMMANDS:
         os.makedirs(os.path.join(args.outdir, 'detail'), exist_ok=True)
         COMMANDS[args.test](args)
+        set_status(args, 'Compressing the results...')
         zip(args.outdir)
-        print('The tests are finished. Thank you! Please send us the generated file (' + args.outdir + '.zip).')
+        set_status(args, 'The tests are finished.')
+        print('Thank you! Please send us the generated file (' + args.outdir + '.zip).')
     else:
         print('Invalid test type, needs to be one of: ' + ', '.join(COMMANDS.keys()))
 
