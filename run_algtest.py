@@ -20,6 +20,13 @@ DEVICE = '/dev/tpm0'
 IMAGE_TAG = 'v2.1'
 
 
+def get_algtest(args):
+    if args.use_system_algtest:
+        return 'tpm2_algtest'
+    else:
+        return 'build/tpm2_algtest'
+
+
 def set_status(args, status):
     if args.machine_readable_statuses:
         status = f"+++{status}+++"
@@ -438,7 +445,7 @@ def capability_handler(args):
 
 def keygen_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
-    run_command = ['sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir, '-T', 'device', '-s', 'keygen']
+    run_command = ['sudo', get_algtest(args), '--outdir=' + detail_dir, '-T', 'device', '-s', 'keygen']
     add_args(run_command, args)
 
     with open(os.path.join(detail_dir, 'keygen_log.txt'), 'w') as logfile:
@@ -453,7 +460,7 @@ def keygen_handler(args):
 
 def perf_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
-    run_command = ['sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir, '-T', 'device', '-s', 'perf']
+    run_command = ['sudo', get_algtest(args), '--outdir=' + detail_dir, '-T', 'device', '-s', 'perf']
     add_args(run_command, args)
 
     with open(os.path.join(detail_dir, 'perf_log.txt'), 'w') as logfile:
@@ -462,7 +469,7 @@ def perf_handler(args):
 
 def cryptoops_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
-    run_command = ['sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir, '-T', 'device', '-s', 'cryptoops']
+    run_command = ['sudo', get_algtest(args), '--outdir=' + detail_dir, '-T', 'device', '-s', 'cryptoops']
     add_args(run_command, args)
 
     with open(os.path.join(detail_dir, 'cryptoops_log.txt'), 'w') as logfile:
@@ -487,7 +494,7 @@ def cryptoops_handler(args):
 
 def rng_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
-    run_command = ['sudo', 'build/tpm2_algtest', '--outdir=' + detail_dir, '-T', 'device', '-s', 'rng']
+    run_command = ['sudo', get_algtest(args), '--outdir=' + detail_dir, '-T', 'device', '-s', 'rng']
     add_args(run_command, args)
 
     with open(os.path.join(detail_dir, 'rng_log.txt'), 'w') as logfile:
@@ -867,6 +874,7 @@ def main():
     parser.add_argument('--only-measure', action='store_true', default=False)
     parser.add_argument('--include-legacy', action='store_true', default=False)
     parser.add_argument('--machine-readable-statuses', action='store_true', default=False)
+    parser.add_argument('--use-system-algtest', action='store_true', default=False)
     args = parser.parse_args()
 
     if not os.path.exists(DEVICE):
