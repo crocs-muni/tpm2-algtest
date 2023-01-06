@@ -8,7 +8,7 @@ License:    BSD
 URL:        https://github.com/danzatt/tpm2-algtest
 VCS:        {{{ git_dir_vcs }}}
 Source:     {{{ git_dir_pack }}}
-Requires:   tpm2-tss tpm2-tools
+Requires:   tpm2-tss tpm2-tools python3-cryptography
 BuildRequires: cmake make gcc tpm2-tss-devel openssl-devel
 
 %description
@@ -30,11 +30,14 @@ cmake ..
 make
 
 %install
+mkdir -p %{buildroot}/usr/bin/
+cp run_algtest.py %{buildroot}/usr/bin/
 cd build
 make DESTDIR=%{buildroot} install
 
 %files
 /usr/bin/tpm2_algtest
+/usr/bin/run_algtest.py
 
 %changelog
 {{{ git_dir_changelog }}}
