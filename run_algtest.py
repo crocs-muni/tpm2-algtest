@@ -413,10 +413,10 @@ def capability_handler(args):
     run_command = ['sudo', 'tpm2_getcap', '-T', 'device']
 
     with open(os.path.join(detail_dir, "Capability_pcrread.txt"), 'w') as outfile:
-        subprocess.run(['tpm2_pcrread'], stdout=outfile)
+        subprocess.run(['sudo', 'tpm2_pcrread'], stdout=outfile)
 
     # Get anonymized endorsement certificates
-    subprocess.run(['tpm2_getekcertificate', '-o', 'ek-rsa.cer', '-o', 'ek-ecc.cer'], stdout=subprocess.DEVNULL)
+    subprocess.run(['sudo', 'tpm2_getekcertificate', '-o', 'ek-rsa.cer', '-o', 'ek-ecc.cer'], stdout=subprocess.DEVNULL)
     try:
         anonymized_rsa = get_anonymized_rsa("ek-rsa.cer")
         anonymized_cert = get_anonymized_cert("ek-rsa.cer")
@@ -435,7 +435,7 @@ def capability_handler(args):
     subprocess.run(['rm', '-f', 'ek-rsa.cer', 'ek-ecc.cer'], stdout=subprocess.DEVNULL)
 
     with open(os.path.join(detail_dir, "Capability_pcrread.txt"), 'w') as outfile:
-        subprocess.run(['tpm2_pcrread'], stdout=outfile).check_returncode()
+        subprocess.run(['sudo', 'tpm2_pcrread'], stdout=outfile).check_returncode()
 
     for command in ("algorithms", "commands", "properties-fixed", "properties-variable", "ecc-curves", "handles-persistent"):
         with open(os.path.join(detail_dir, f"Capability_{command}.txt"), 'w') as outfile:
