@@ -62,7 +62,9 @@ def zip(outdir):
     zipf = zipfile.ZipFile(outdir + '.zip', 'w', zipfile.ZIP_DEFLATED)
     for root, _, files in os.walk(outdir):
         for file in files:
-            zipf.write(os.path.join(root, file))
+            abs_src = os.path.abspath(os.path.join(root, file))
+            abs_outdir = os.path.abspath(outdir)
+            zipf.write(abs_src, arcname=abs_src[len(abs_outdir):])
 
 
 def remove_control_chars(string):
