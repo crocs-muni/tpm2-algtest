@@ -412,13 +412,13 @@ def system_info(args, detail_dir):
 
 def capability_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
-    run_command = ['sudo', 'tpm2_getcap', '-T', 'device']
+    run_command = ['sudo', 'tpm2_getcap', '-T', args.with_tctii]
 
     with open(os.path.join(detail_dir, "Capability_pcrread.txt"), 'w') as outfile:
-        subprocess.run(['sudo', 'tpm2_pcrread', '-T', 'device'], stdout=outfile)
+        subprocess.run(['sudo', 'tpm2_pcrread', '-T', args.with_tctii], stdout=outfile)
 
     # Get anonymized endorsement certificates
-    subprocess.run(['sudo', 'tpm2_getekcertificate', '-T', 'device', '-o', 'ek-rsa.cer', '-o', 'ek-ecc.cer'], stdout=subprocess.DEVNULL)
+    subprocess.run(['sudo', 'tpm2_getekcertificate', '-T', args.with_tctii, '-o', 'ek-rsa.cer', '-o', 'ek-ecc.cer'], stdout=subprocess.DEVNULL)
     try:
         anonymized_rsa = get_anonymized_rsa("ek-rsa.cer")
         anonymized_cert = get_anonymized_cert("ek-rsa.cer")
@@ -437,7 +437,7 @@ def capability_handler(args):
     subprocess.run(['rm', '-f', 'ek-rsa.cer', 'ek-ecc.cer'], stdout=subprocess.DEVNULL)
 
     with open(os.path.join(detail_dir, "Capability_pcrread.txt"), 'w') as outfile:
-        subprocess.run(['sudo', 'tpm2_pcrread', '-T', 'device'], stdout=outfile).check_returncode()
+        subprocess.run(['sudo', 'tpm2_pcrread', '-T', args.with_tctii], stdout=outfile).check_returncode()
 
     for command in ("algorithms", "commands", "properties-fixed", "properties-variable", "ecc-curves", "handles-persistent"):
         with open(os.path.join(detail_dir, f"Capability_{command}.txt"), 'w') as outfile:
@@ -449,7 +449,7 @@ def capability_handler(args):
 
 def keygen_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
-    run_command = ['sudo', get_algtest(args), '--outdir=' + detail_dir, '-T', 'device', '-s', 'keygen']
+    run_command = ['sudo', get_algtest(args), '--outdir=' + detail_dir, '-T', args.with_tctii, '-s', 'keygen']
     add_args(run_command, args)
 
     with open(os.path.join(detail_dir, 'keygen_log.txt'), 'w') as logfile:
@@ -464,7 +464,7 @@ def keygen_handler(args):
 
 def perf_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
-    run_command = ['sudo', get_algtest(args), '--outdir=' + detail_dir, '-T', 'device', '-s', 'perf']
+    run_command = ['sudo', get_algtest(args), '--outdir=' + detail_dir, '-T', args.with_tctii, '-s', 'perf']
     add_args(run_command, args)
 
     with open(os.path.join(detail_dir, 'perf_log.txt'), 'w') as logfile:
@@ -473,7 +473,7 @@ def perf_handler(args):
 
 def cryptoops_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
-    run_command = ['sudo', get_algtest(args), '--outdir=' + detail_dir, '-T', 'device', '-s', 'cryptoops']
+    run_command = ['sudo', get_algtest(args), '--outdir=' + detail_dir, '-T', args.with_tctii, '-s', 'cryptoops']
     add_args(run_command, args)
 
     with open(os.path.join(detail_dir, 'cryptoops_log.txt'), 'w') as logfile:
@@ -498,7 +498,7 @@ def cryptoops_handler(args):
 
 def rng_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
-    run_command = ['sudo', get_algtest(args), '--outdir=' + detail_dir, '-T', 'device', '-s', 'rng']
+    run_command = ['sudo', get_algtest(args), '--outdir=' + detail_dir, '-T', args.with_tctii, '-s', 'rng']
     add_args(run_command, args)
 
     with open(os.path.join(detail_dir, 'rng_log.txt'), 'w') as logfile:
@@ -879,6 +879,7 @@ def main():
     parser.add_argument('--include-legacy', action='store_true', default=False)
     parser.add_argument('--machine-readable-statuses', action='store_true', default=False)
     parser.add_argument('--use-system-algtest', action='store_true', default=False)
+    parser.add_argument('--with-tctii', type=str, required=False, default="device")
     args = parser.parse_args()
 
     if not os.path.exists(DEVICE):
