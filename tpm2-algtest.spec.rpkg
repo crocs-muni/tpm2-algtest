@@ -2,7 +2,7 @@
 
 Name:       {{{ git_dir_name }}}
 Version:    0.5
-Release:    3%{?dist}
+Release:    4%{?dist}
 Summary:    TPM2 performance testing tool
 License:    BSD
 URL:        https://github.com/danzatt/tpm2-algtest
