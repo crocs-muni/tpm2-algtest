@@ -597,22 +597,27 @@ def extensive_handler(args):
             create_legacy_result_files(args.outdir)
 
 
+def escape_yaml_string(string):
+    string = string.replace('"', '\\"')
+    return f'"{string}"'
+
+
 def write_header(file, detail_dir):
     image_tag = get_image_tag(detail_dir)
     manufacturer, vendor_str, fw = get_tpm_id(detail_dir)
-    file.write(f'Execution date/time: {datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")}\n')
-    file.write(f'Manufacturer: {manufacturer}\n')
-    file.write(f'Vendor string: {vendor_str}\n')
-    file.write(f'Firmware version: {fw}\n')
-    file.write(f'Image tag: {image_tag}\n')
+    file.write(f'Execution date/time: {escape_yaml_string(datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"))}\n')
+    file.write(f'Manufacturer: {escape_yaml_string(manufacturer)}\n')
+    file.write(f'Vendor string: {escape_yaml_string(vendor_str)}\n')
+    file.write(f'Firmware version: {escape_yaml_string(fw)}\n')
+    file.write(f'Image tag: {escape_yaml_string(image_tag)}\n')
     file.write(f'TPM devices: {", ".join(glob.glob("/dev/tpm*"))}\n')
     try:
         system_manufacturer, product_name, system_version, bios_version, uname = get_system_id(detail_dir)
-        file.write(f'Device manufacturer: {system_manufacturer}\n')
-        file.write(f'Device name: {product_name}\n')
-        file.write(f'Device version: {system_version}\n')
-        file.write(f'BIOS version: {bios_version}\n')
-        file.write(f'System information: {uname}\n')
+        file.write(f'Device manufacturer: {escape_yaml_string(system_manufacturer)}\n')
+        file.write(f'Device name: {escape_yaml_string(product_name)}\n')
+        file.write(f'Device version: {escape_yaml_string(system_version)}\n')
+        file.write(f'BIOS version: {escape_yaml_string(bios_version)}\n')
+        file.write(f'System information: {escape_yaml_string(uname)}\n')
     except:
         pass
     file.write('\n')
