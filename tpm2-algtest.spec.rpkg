@@ -5,7 +5,7 @@ Version:    0.5
 Release:    4%{?dist}
 Summary:    TPM2 performance testing tool
 License:    BSD
-URL:        https://github.com/danzatt/tpm2-algtest
+URL:        https://github.com/crocs-muni/tpm2-algtest
 VCS:        {{{ git_dir_vcs }}}
 Source:     {{{ git_dir_pack }}}
 Requires:   tpm2-tss tpm2-tools python3-cryptography
