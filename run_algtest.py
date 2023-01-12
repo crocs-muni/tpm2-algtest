@@ -414,37 +414,43 @@ def capability_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
     run_command = ['sudo', 'tpm2_getcap', '-T', args.with_tctii]
 
-    with open(os.path.join(detail_dir, "Capability_pcrread.txt"), 'w') as outfile:
-        subprocess.run(['sudo', 'tpm2_pcrread', '-T', args.with_tctii], stdout=outfile)
+    with open(os.path.join(detail_dir, "capability_log.txt"), "w") as logfile:
+        print('Running capability test...')
 
-    # Get anonymized endorsement certificates
-    subprocess.run(['sudo', 'tpm2_getekcertificate', '-T', args.with_tctii, '-o', 'ek-rsa.cer', '-o', 'ek-ecc.cer'], stdout=subprocess.DEVNULL)
-    try:
-        anonymized_rsa = get_anonymized_rsa("ek-rsa.cer")
-        anonymized_cert = get_anonymized_cert("ek-rsa.cer")
-        with open(os.path.join(detail_dir, "Capability_ek-rsa.txt"), "w") as outfile:
-            outfile.write(anonymized_rsa + anonymized_cert)
-    except:
-        print("Could not obtain RSA endorsement certificate")
+        print("Running tpm2_getekcertificate", file=logfile)
+        subprocess.run(['sudo', 'tpm2_getekcertificate', '-T', args.with_tctii, '-o', 'ek-rsa.cer', '-o', 'ek-ecc.cer'], stdout=logfile, stderr=logfile)
+        try:
+            anonymized_rsa = get_anonymized_rsa("ek-rsa.cer")
+            anonymized_cert = get_anonymized_cert("ek-rsa.cer")
+            with open(os.path.join(detail_dir, "Capability_ek-rsa.txt"), "w") as outfile:
+                outfile.write(anonymized_rsa + anonymized_cert)
+        except:
+            print("Could not obtain RSA endorsement certificate")
+            print("Could not obtain RSA endorsement certificate", file=logfile)
 
-    try:
-        anonymized_ecc = get_anonymized_ecc("ek-ecc.cer")
-        anonymized_cert = get_anonymized_cert("ek-ecc.cer")
-        with open(os.path.join(detail_dir, "Capability_ek-ecc.txt"), "w") as outfile:
-            outfile.write(anonymized_ecc + anonymized_cert)
-    except:
-        print("Could not obtain ECC endorsement certificate")
-    subprocess.run(['rm', '-f', 'ek-rsa.cer', 'ek-ecc.cer'], stdout=subprocess.DEVNULL)
+        try:
+            anonymized_ecc = get_anonymized_ecc("ek-ecc.cer")
+            anonymized_cert = get_anonymized_cert("ek-ecc.cer")
+            with open(os.path.join(detail_dir, "Capability_ek-ecc.txt"), "w") as outfile:
+                outfile.write(anonymized_ecc + anonymized_cert)
+        except:
+            print("Could not obtain ECC endorsement certificate")
+            print("Could not obtain ECC endorsement certificate", file=logfile)
 
-    with open(os.path.join(detail_dir, "Capability_pcrread.txt"), 'w') as outfile:
-        subprocess.run(['sudo', 'tpm2_pcrread', '-T', args.with_tctii], stdout=outfile).check_returncode()
+        print("Removing output certificates", file=logfile)
+        subprocess.run(['sudo', 'rm', '-f', 'ek-rsa.cer', 'ek-ecc.cer'], stdout=logfile, stderr=logfile)
 
-    for command in ("algorithms", "commands", "properties-fixed", "properties-variable", "ecc-curves", "handles-persistent"):
-        with open(os.path.join(detail_dir, f"Capability_{command}.txt"), 'w') as outfile:
-            try:
-                subprocess.run(run_command + ["-c", command], stdout=outfile, stderr=subprocess.DEVNULL).check_returncode()
-            except:
-                subprocess.run(run_command + [command], stdout=outfile).check_returncode()
+        print("Running tpm2_pcrread", file=logfile)
+        with open(os.path.join(detail_dir, "Capability_pcrread.txt"), 'w') as outfile:
+            subprocess.run(['sudo', 'tpm2_pcrread', '-T', args.with_tctii], stdout=outfile, stderr=logfile)
+
+        for command in ("algorithms", "commands", "properties-fixed", "properties-variable", "ecc-curves", "handles-persistent"):
+            print(f"Running tpm2_getcap {command}", file=logfile)
+            with open(os.path.join(detail_dir, f"Capability_{command}.txt"), 'w') as outfile:
+                try:
+                    subprocess.run(run_command + ["-c", command], stdout=outfile, stderr=logfile).check_returncode()
+                except:
+                    subprocess.run(run_command + [command], stdout=outfile, stderr=logfile)
 
 
 def keygen_handler(args):
