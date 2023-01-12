@@ -334,8 +334,11 @@ def get_system_id(detail_dir):
 
 
 def get_image_tag(detail_dir):
-    with open(os.path.join(detail_dir, 'image_tag.txt'), 'r') as f:
-        image_tag = f.read()
+    try:
+        with open(os.path.join(detail_dir, 'image_tag.txt'), 'r') as f:
+            image_tag = f.read()
+    except FileNotFoundError:
+        image_tag = "UNKNOWN"
     return image_tag
 
 
