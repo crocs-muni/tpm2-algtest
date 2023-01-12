@@ -342,8 +342,9 @@ def get_image_tag(detail_dir):
     return image_tag
 
 
-def get_anonymized_cert(cert_path):
-    process = subprocess.run(['openssl', 'x509', '-in', cert_path, '-noout', '-text'], capture_output=True)
+def get_anonymized_cert(cert_path, logfile=sys.stderr):
+    process = subprocess.run(['sudo', 'openssl', 'x509', '-in', cert_path, '-noout', '-text'], capture_output=True)
+    print(process.stderr.decode(), file=logfile)
     process.check_returncode()
     data = process.stdout.decode().split("\n")
     anonymize_depth = None
@@ -373,8 +374,9 @@ def get_anonymized_cert(cert_path):
     return output if anonymized >= 3 else ""
 
 
-def get_anonymized_ecc(cert_path):
-    process = subprocess.run(['openssl', 'x509', '-in', cert_path, '-noout', '-pubkey'], capture_output=True)
+def get_anonymized_ecc(cert_path, logfile=sys.stderr):
+    process = subprocess.run(['sudo', 'openssl', 'x509', '-in', cert_path, '-noout', '-pubkey'], capture_output=True)
+    print(process.stderr.decode(), file=logfile)
     process.check_returncode()
     data = process.stdout
     key = load_pem_public_key(data)
@@ -383,8 +385,9 @@ def get_anonymized_ecc(cert_path):
     return f"Anonymized:\n  pub prefix: {point[:6]}\n  pub suffix: {point[-4:]}\n"
 
 
-def get_anonymized_rsa(cert_path):
-    process = subprocess.run(['openssl', 'x509', '-in', cert_path, '-noout', '-pubkey'], capture_output=True)
+def get_anonymized_rsa(cert_path, logfile=sys.stderr):
+    process = subprocess.run(['sudo', 'openssl', 'x509', '-in', cert_path, '-noout', '-pubkey'], capture_output=True)
+    print(process.stderr.decode(), file=logfile)
     process.check_returncode()
     data = process.stdout
     key = load_pem_public_key(data)
@@ -423,21 +426,21 @@ def capability_handler(args):
         print("Running tpm2_getekcertificate", file=logfile)
         subprocess.run(['sudo', 'tpm2_getekcertificate', '-T', args.with_tctii, '-o', 'ek-rsa.cer', '-o', 'ek-ecc.cer'], stdout=logfile, stderr=logfile)
         try:
-            anonymized_rsa = get_anonymized_rsa("ek-rsa.cer")
-            anonymized_cert = get_anonymized_cert("ek-rsa.cer")
+            print("Anonymizing RSA endorsement certificate", file=logfile)
+            anonymized_rsa = get_anonymized_rsa("ek-rsa.cer", logfile)
+            anonymized_cert = get_anonymized_cert("ek-rsa.cer", logfile)
             with open(os.path.join(detail_dir, "Capability_ek-rsa.txt"), "w") as outfile:
                 outfile.write(anonymized_rsa + anonymized_cert)
         except:
-            print("Could not obtain RSA endorsement certificate")
             print("Could not obtain RSA endorsement certificate", file=logfile)
 
         try:
-            anonymized_ecc = get_anonymized_ecc("ek-ecc.cer")
-            anonymized_cert = get_anonymized_cert("ek-ecc.cer")
+            print("Anonymizing ECC endorsement certificate", file=logfile)
+            anonymized_ecc = get_anonymized_ecc("ek-ecc.cer", logfile)
+            anonymized_cert = get_anonymized_cert("ek-ecc.cer", logfile)
             with open(os.path.join(detail_dir, "Capability_ek-ecc.txt"), "w") as outfile:
                 outfile.write(anonymized_ecc + anonymized_cert)
         except:
-            print("Could not obtain ECC endorsement certificate")
             print("Could not obtain ECC endorsement certificate", file=logfile)
 
         print("Removing output certificates", file=logfile)
