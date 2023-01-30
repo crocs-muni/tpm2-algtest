@@ -97,21 +97,21 @@ bool test_detail(
 
         switch (scenario->key_params.type) {
         case TPM2_ALG_RSA:
-            log_info("Keygen %d: RSA | keybits %d | duration %f | rc %04x",
+            log_info("Keygen %d: RSA | keybits %d | duration %.9f | rc %04x",
                     i, scenario->key_params.parameters.rsaDetail.keyBits,
                     result->data_points[i].duration_s, result->data_points[i].rc);
             break;
         case TPM2_ALG_ECC:
-            log_info("Keygen %d: ECC | curve %04x | duration %f | rc %04x",
+            log_info("Keygen %d: ECC | curve %04x | duration %.9f | rc %04x",
                     i, scenario->key_params.parameters.eccDetail.curveID,
                     result->data_points[i].duration_s, result->data_points[i].rc);
             break;
         case TPM2_ALG_KEYEDHASH:
-            log_info("Keygen %d: KEYEDHASH | duration %f | rc %04x",
+            log_info("Keygen %d: KEYEDHASH | duration %.9f | rc %04x",
                     i, result->data_points[i].duration_s, result->data_points[i].rc);
             break;
         case TPM2_ALG_SYMCIPHER:
-            log_info("Keygen %d: SYMCIPHER | algorithm %04x | keylen %d | duration %f | rc %04x",
+            log_info("Keygen %d: SYMCIPHER | algorithm %04x | keylen %d | duration %.9f | rc %04x",
                     i, scenario->key_params.parameters.symDetail.sym.algorithm,
                     scenario->key_params.parameters.symDetail.sym.keyBits.sym,
                     result->data_points[i].duration_s, result->data_points[i].rc);
@@ -165,7 +165,7 @@ void output_results(
     FILE* out = open_csv(filename, "duration,return_code");
     for (int i = 0; i < result->size; ++i) {
         struct keygen_data_point *dp = &result->data_points[i];
-        fprintf(out, "%f,%04x\n", dp->duration_s, dp->rc);
+        fprintf(out, "%.9f,%04x\n", dp->duration_s, dp->rc);
     }
     fclose(out);
 
@@ -185,7 +185,7 @@ void output_results(
             for (int j = 0; j < result->keypairs[i].private_key.rsa.size; ++j) {
                 fprintf(out, "%02X", result->keypairs[i].private_key.rsa.buffer[j]);
             }
-            fprintf(out, ",%f\n", result->data_points[i].duration_s);
+            fprintf(out, ",%.9f\n", result->data_points[i].duration_s);
         }
         break;
     case TPM2_ALG_ECC:
@@ -203,7 +203,7 @@ void output_results(
             for (int j = 0; j < result->keypairs[i].private_key.ecc.size; ++j) {
                 fprintf(out, "%02X", result->keypairs[i].private_key.ecc.buffer[j]);
             }
-            fprintf(out, ",%f\n", result->data_points[i].duration_s);
+            fprintf(out, ",%.9f\n", result->data_points[i].duration_s);
         }
         break;
     case TPM2_ALG_KEYEDHASH:

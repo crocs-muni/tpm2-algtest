@@ -114,7 +114,7 @@ void output_results(
     FILE *out = open_csv(filename, "duration,duration_extra,return_code");
     for (int i = 0; i < result->size; ++i) {
         struct perf_data_point *dp = &result->data_points[i];
-        fprintf(out, "%f,%f,%04x\n", dp->duration_s, dp->duration_extra_s, dp->rc);
+        fprintf(out, "%.9f,%.9f,%04x\n", dp->duration_s, dp->duration_extra_s, dp->rc);
     }
     fclose(out);
 }
@@ -171,13 +171,13 @@ bool run_perf_sign(
         ++result->size;
         switch (scenario->sign.key_params.type) {
         case TPM2_ALG_RSA:
-            log_info("Perf sign %d: RSA | scheme %04x | keybits %d | duration %f | rc %04x",
+            log_info("Perf sign %d: RSA | scheme %04x | keybits %d | duration %.9f | rc %04x",
                     i, scenario->sign.scheme.scheme,
                     scenario->sign.key_params.parameters.rsaDetail.keyBits,
                     result->data_points[i].duration_s, result->data_points[i].rc);
             break;
         case TPM2_ALG_ECC:
-            log_info("Perf sign %d: ECC | scheme %04x | curve %04x | duration %f | rc %04x",
+            log_info("Perf sign %d: ECC | scheme %04x | curve %04x | duration %.9f | rc %04x",
                     i, scenario->sign.scheme.scheme,
                     scenario->sign.key_params.parameters.eccDetail.curveID,
                     result->data_points[i].duration_s, result->data_points[i].rc);
@@ -263,13 +263,13 @@ bool run_perf_verifysignature(
         ++result->size;
         switch (scenario->verifysignature.key_params.type) {
         case TPM2_ALG_RSA:
-            log_info("Perf verifysignature %d: RSA | scheme %04x | keybits %d | duration %f | rc %04x",
+            log_info("Perf verifysignature %d: RSA | scheme %04x | keybits %d | duration %.9f | rc %04x",
                     i, scenario->verifysignature.scheme.scheme,
                     scenario->verifysignature.key_params.parameters.rsaDetail.keyBits,
                     result->data_points[i].duration_s, result->data_points[i].rc);
                     break;
         case TPM2_ALG_ECC:
-            log_info("Perf verifysignature %d: ECC | scheme %04x | curve %04x | duration %f | rc %04x",
+            log_info("Perf verifysignature %d: ECC | scheme %04x | curve %04x | duration %.9f | rc %04x",
                     i, scenario->verifysignature.scheme.scheme,
                     scenario->verifysignature.key_params.parameters.eccDetail.curveID,
                     result->data_points[i].duration_s, result->data_points[i].rc);
@@ -331,7 +331,7 @@ bool run_perf_rsa_encrypt(
             ++failures;
         }
         ++result->size;
-        log_info("Perf rsa_encrypt: %d: scheme: %04x | keybits %d | duration %f | rc %04x",
+        log_info("Perf rsa_encrypt: %d: scheme: %04x | keybits %d | duration %.9f | rc %04x",
                 i, scenario->rsa_encrypt.scheme.scheme,
                 scenario->rsa_encrypt.keylen, result->data_points[i].duration_s,
                 result->data_points[i].rc);
@@ -396,7 +396,7 @@ bool run_perf_rsa_decrypt(
             ++failures;
         }
         ++result->size;
-        log_info("Perf rsa_decrypt: %d: scheme %04x | keybits %d | duration %f | rc %04x",
+        log_info("Perf rsa_decrypt: %d: scheme %04x | keybits %d | duration %.9f | rc %04x",
                 i, scenario->rsa_decrypt.scheme.scheme,
                 scenario->rsa_decrypt.keylen, result->data_points[i].duration_s,
                 result->data_points[i].rc);
@@ -482,7 +482,7 @@ bool run_perf_encryptdecrypt(
         }
         ++result->size;
 
-        log_info("Perf encryptdecrypt %d: algorithm %04x | keybits %d | mode %04x | %s | deprecated %s | duration %f | rc %04x",
+        log_info("Perf encryptdecrypt %d: algorithm %04x | keybits %d | mode %04x | %s | deprecated %s | duration %.9f | rc %04x",
                 i, scenario->encryptdecrypt.sym.algorithm,
                 scenario->encryptdecrypt.sym.keyBits,
                 scenario->encryptdecrypt.sym.mode,
@@ -560,7 +560,7 @@ bool run_perf_hmac(
         }
         ++result->size;
 
-        log_info("Perf hmac %d: duration %f | rc %04x",
+        log_info("Perf hmac %d: duration %.9f | rc %04x",
                 i, result->data_points[i].duration_s, result->data_points[i].rc);
 
         printf("%lu%%\n", increase_progress(prog));
@@ -620,7 +620,7 @@ bool run_perf_zgen(
         result->data_points[i].rc = ec_ephemeral(sapi_context, scenario->zgen.key_params.parameters.eccDetail.curveID,
                                                  &point, &counter, &result->data_points[i].duration_extra_s);
 
-        log_info("Perf zgen (phase 1) %d: curve %04x | duration %f | rc %04x",
+        log_info("Perf zgen (phase 1) %d: curve %04x | duration %.9f | rc %04x",
                  i, scenario->zgen.key_params.parameters.eccDetail.curveID,
                  result->data_points[i].duration_extra_s, result->data_points[i].rc);
         if (result->data_points[i].rc == TPM2_RC_SUCCESS) {
@@ -628,7 +628,7 @@ bool run_perf_zgen(
             TPM2B_ECC_POINT outZ1 = { .size = 0 };
             TPM2B_ECC_POINT outZ2 = { .size = 0 };
             result->data_points[i].rc = zgen_2phase(sapi_context, object_handle, &point, &point, scenario->zgen.scheme, counter, &outZ1, &outZ2, &result->data_points[i].duration_s);
-            log_info("Perf zgen (phase 2) %d: curve %04x | scheme %04x | duration %f | rc %04x",
+            log_info("Perf zgen (phase 2) %d: curve %04x | scheme %04x | duration %.9f | rc %04x",
                      i, scenario->zgen.key_params.parameters.eccDetail.curveID, scenario->zgen.scheme,
                      result->data_points[i].duration_s, result->data_points[i].rc);
 
@@ -729,7 +729,7 @@ void run_perf_getrandom(
         }
 
         ++result.size;
-        log_info("Perf getrandom: %d: duration %f | rc %04x",
+        log_info("Perf getrandom: %d: duration %.9f | rc %04x",
                 i, result.data_points[i].duration_s, result.data_points[i].rc);
 
         printf("%lu%%\n", increase_progress(prog));
@@ -784,7 +784,7 @@ void run_perf_hash(
             ++failures;
         }
         ++result.size;
-        log_info("Perf hash: %d: algorithm %04x | duration %f | rc %04x",
+        log_info("Perf hash: %d: algorithm %04x | duration %.9f | rc %04x",
                 i, scenario->hash.hash_alg, result.data_points[i].duration_s,
                 result.data_points[i].rc);
         printf("%lu%%\n", increase_progress(prog));

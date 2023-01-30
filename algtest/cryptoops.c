@@ -98,7 +98,7 @@ void output_ecc_results(
         for(uint16_t j = 0; j < dp->ecc.nonce_point_y_size; ++j) {
             fprintf(out, "%02x", dp->ecc.nonce_point_y[j]);
         }
-        fprintf(out, ",%f,%f,%04x\n", dp->duration_s, dp->duration_extra_s, dp->rc);
+        fprintf(out, ",%.9f,%.9f,%04x\n", dp->duration_s, dp->duration_extra_s, dp->rc);
     }
     fclose(out);
 }
@@ -131,7 +131,7 @@ void output_rsa_results(
         for(uint16_t j = 0; j < dp->rsa.public_key_size; ++j) {
             fprintf(out, "%02x", dp->rsa.public_key[j]);
         }
-        fprintf(out, ",%f,%04x\n", dp->duration_s, dp->rc);
+        fprintf(out, ",%.9f,%04x\n", dp->duration_s, dp->rc);
     }
     fclose(out);
 }
@@ -258,7 +258,7 @@ bool run_ecc_sign(
             ++failures;
         }
         ++result->size;
-        log_info("Cryptoops ecc %d: | scheme %04x | curve %04x | duration %f | duration extra %f | rc %04x",
+        log_info("Cryptoops ecc %d: | scheme %04x | curve %04x | duration %.9f | duration extra %.9f | rc %04x",
                 i, scenario->sign.scheme.scheme,
                 scenario->sign.key_params.parameters.eccDetail.curveID,
                 result->data_points[i].duration_s, result->data_points[i].duration_extra_s, result->data_points[i].rc);
@@ -393,7 +393,7 @@ bool run_rsa_sign(
             ++failures;
         }
         ++result->size;
-        log_info("Cryptoops rsa %d: scheme %04x | duration %f | rc %04x",
+        log_info("Cryptoops rsa %d: scheme %04x | duration %.9f | rc %04x",
                  i, scenario->sign.scheme.scheme,
                  result->data_points[i].duration_s, result->data_points[i].rc);
 
