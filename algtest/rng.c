@@ -77,7 +77,7 @@ void run_rng_getrandom(
             ++failures;
         }
 
-        log_info("Rng %d: duration %f | rc %04x", i, duration, rc);
+        log_info("Rng %d: duration %.9f | rc %04x", i, duration, rc);
         printf("%lu%%\n", increase_progress(prog));
 
         if(failures >= FAILURE_LIMIT) {

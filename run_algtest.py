@@ -421,8 +421,6 @@ def capability_handler(args):
     run_command = ['sudo', 'tpm2_getcap', '-T', args.with_tctii]
 
     with open(os.path.join(detail_dir, "capability_log.txt"), "w") as logfile:
-        print('Running capability test...')
-
         print("Running tpm2_getekcertificate", file=logfile)
         subprocess.run(['sudo', 'tpm2_getekcertificate', '-T', args.with_tctii, '-o', 'ek-rsa.cer', '-o', 'ek-ecc.cer'], stdout=logfile, stderr=logfile)
         try:
