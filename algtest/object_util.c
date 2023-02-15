@@ -52,17 +52,17 @@ TSS2L_SYS_AUTH_COMMAND prepare_dup_policy_session(TSS2_SYS_CONTEXT *sapi_context
             tpmKey, bind, NULL, &nonceCaller, &encryptedSalt, sessionType,
             &symmetric, authHash, sessionHandle, &nonceTPM, &rspAuthsArray);
     if (rc != TPM2_RC_SUCCESS) {
-        log_error("Cannot start DUP policy session! (%0x4)", rc);
+        log_error("Cannot start DUP policy session! (%04x)", rc);
     }
     TPM2B_DIGEST authPolicy;
     rc = Tss2_Sys_PolicyCommandCode(sapi_context, *sessionHandle, NULL,
             TPM2_CC_Duplicate, NULL);
     if (rc != TPM2_RC_SUCCESS) {
-        log_error("Cannot policy command code %04x", rc);
+        log_error("Cannot policy command code (%04x)", rc);
     }
     rc = Tss2_Sys_PolicyGetDigest(sapi_context, *sessionHandle, NULL, &authPolicy, NULL);
     if (rc != TPM2_RC_SUCCESS) {
-        log_error("Cannot get digest (%0x4)", rc);
+        log_error("Cannot get digest (%04x)", rc);
     }
 
     TPMS_AUTH_COMMAND sessionData = {
@@ -101,11 +101,11 @@ TPM2B_DIGEST create_dup_policy(TSS2_SYS_CONTEXT *sapi_context)
     rc = Tss2_Sys_PolicyCommandCode(sapi_context, sessionHandle, NULL,
             TPM2_CC_Duplicate, NULL);
     if (rc != TPM2_RC_SUCCESS) {
-        log_error("Cannot policy command code %04x", rc);
+        log_error("Cannot policy command code (%04x)", rc);
     }
     rc = Tss2_Sys_PolicyGetDigest(sapi_context, sessionHandle, NULL, &authPolicy, NULL);
     if (rc != TPM2_RC_SUCCESS) {
-        log_error("Cannot get digest (%0x4)", rc);
+        log_error("Cannot get digest (%04x)", rc);
     }
     Tss2_Sys_FlushContext(sapi_context, sessionHandle);
     return authPolicy;

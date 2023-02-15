@@ -19,7 +19,7 @@ from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicKey
 
 DEVICE = '/dev/tpm0'
-IMAGE_TAG = 'v2.1'
+IMAGE_TAG = 'v2.2'
 
 
 def get_algtest(args):
