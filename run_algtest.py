@@ -358,7 +358,7 @@ def get_anonymized_cert(cert_path, logfile=sys.stderr):
                 break
             depth += 1
 
-        if anonymize_depth is None and "Modulus" in line or "pub" in line or "Serial Number" in line or "Subject Alternative Name" in line or "Signature Value" in line:
+        if anonymize_depth is None and "Modulus" in line or "pub" in line or "Serial Number" in line or "Subject Alternative Name" in line or "Signature Value" in line or "Subject Key Identifier" in line:
             anonymized += 1
             anonymize_depth = depth
             output += line + "\n"
