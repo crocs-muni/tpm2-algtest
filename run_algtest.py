@@ -342,15 +342,7 @@ def get_image_tag(detail_dir):
     return image_tag
 
 
-def get_cert(cert_path, logfile=sys.stderr, anonymize=True):
-    process = subprocess.run(['sudo', 'openssl', 'x509', '-in', cert_path, '-noout', '-text'], capture_output=True)
-    print(process.stderr.decode(), file=logfile)
-    process.check_returncode()
-    data = process.stdout.decode().split("\n")
-
-    if anonymize is False:
-        return "\n".join(data)
-
+def anonymize_blocks(data, blocks=[]):
     anonymize_depth = None
 
     output = ""
@@ -362,43 +354,68 @@ def get_cert(cert_path, logfile=sys.stderr, anonymize=True):
                 break
             depth += 1
 
-        if anonymize_depth is None and "Modulus" in line or "pub" in line or "Serial Number" in line or "Subject Alternative Name" in line or "Signature Value" in line or "Subject Key Identifier" in line:
+        if anonymize_depth is None and any(map(lambda x: x in line, blocks)):
             anonymized += 1
             anonymize_depth = depth
             output += line + "\n"
             continue
 
-        if anonymize_depth and depth > anonymize_depth:
+        if anonymize_depth is not None and depth > anonymize_depth:
             output += "".join(map(lambda x: x if x in " :" else "X", line)) + "\n"
             continue
 
         output += line + "\n"
         anonymize_depth = None
+    return anonymized, output
+
+
+def get_cert(cert_path, logfile=sys.stderr, anonymize=True):
+    process = subprocess.run(['sudo', 'openssl', 'x509', '-in', cert_path, '-noout', '-text'], capture_output=True)
+    print(process.stderr.decode(), file=logfile)
+    process.check_returncode()
+    data = process.stdout.decode().split("\n")
+
+    if anonymize is False:
+        return "\n".join(data)
+
+    anonymized, output = anonymize_blocks(data, ["Modulus", "pub", "Serial Number", "Subject Alternative Name", "Signature Value", "Subject Key Identifier"])
 
     return output if anonymized >= 3 else ""
 
 
-def get_anonymized_ecc(cert_path, logfile=sys.stderr):
-    process = subprocess.run(['sudo', 'openssl', 'x509', '-in', cert_path, '-noout', '-pubkey'], capture_output=True)
+def get_key(key_path, logfile=sys.stderr, anonymize=True):
+    process = subprocess.run(['sudo', 'openssl', 'pkey', '-pubin', '-in', key_path, '-noout', '-text'], capture_output=True)
     print(process.stderr.decode(), file=logfile)
     process.check_returncode()
-    data = process.stdout
-    key = load_pem_public_key(data)
-    assert isinstance(key, EllipticCurvePublicKey)
-    point = binascii.hexlify(key.public_bytes(Encoding.X962, PublicFormat.CompressedPoint)).decode()
-    return f"Anonymized:\n  pub prefix: {point[:6]}\n  pub suffix: {point[-4:]}\n"
+    data = process.stdout.decode().split("\n")
+
+    if anonymize is False:
+        return "\n".join(data)
+
+    anonymized, output = anonymize_blocks(data, ["Modulus"])
+
+    return output if anonymized >= 1 else ""
 
 
-def get_anonymized_rsa(cert_path, logfile=sys.stderr):
-    process = subprocess.run(['sudo', 'openssl', 'x509', '-in', cert_path, '-noout', '-pubkey'], capture_output=True)
-    print(process.stderr.decode(), file=logfile)
-    process.check_returncode()
-    data = process.stdout
+def get_anonymized_key(path, logfile=sys.stderr, cert=True):
+    if cert:
+        process = subprocess.run(['sudo', 'openssl', 'x509', '-in', path, '-noout', '-pubkey'], capture_output=True)
+        print(process.stderr.decode(), file=logfile)
+        process.check_returncode()
+        data = process.stdout
+    else:
+        with open(path, "r") as f:
+            data = f.read().encode("utf-8")
+
     key = load_pem_public_key(data)
-    assert isinstance(key, RSAPublicKey)
-    n = key.public_numbers().n
-    n = binascii.hexlify(int.to_bytes(n, length=(math.floor(math.log2(n)) // 8) + 1, byteorder="big")).decode()
-    return f"Anonymized:\n  n prefix: {n[:4]}\n  n suffix: {n[-4:]}\n"
+    if isinstance(key, RSAPublicKey):
+        n = key.public_numbers().n
+        n = binascii.hexlify(int.to_bytes(n, length=(math.floor(math.log2(n)) // 8) + 1, byteorder="big")).decode()
+        return f"Anonymized:\n  n prefix: {n[:4]}\n  n suffix: {n[-4:]}\n"
+    if isinstance(key, EllipticCurvePublicKey):
+        point = binascii.hexlify(key.public_bytes(Encoding.X962, PublicFormat.CompressedPoint)).decode()
+        return f"Anonymized:\n  pub prefix: {point[:6]}\n  pub suffix: {point[-4:]}\n"
+    return ""
 
 
 def system_info(args, detail_dir):
@@ -433,14 +450,15 @@ def certs_handler(args):
             if args.disable_anonymize:
                 data = get_cert("ek-rsa.cer", logfile, anonymize=False)
             else:
-                anonymized_rsa = get_anonymized_rsa("ek-rsa.cer", logfile)
+                anonymized_rsa = get_anonymized_key("ek-rsa.cer", logfile)
                 anonymized_cert = get_cert("ek-rsa.cer", logfile, anonymize=True)
                 data = anonymized_rsa + anonymized_cert
 
             with open(os.path.join(detail_dir, "Certs_ek-rsa.txt"), "w") as outfile:
                 outfile.write(data)
-        except:
+        except Exception as e:
             print("Could not obtain RSA endorsement certificate", file=logfile)
+            print(e, file=logfile)
 
         try:
             print(f"Getting {'anonymized ' if not args.disable_anonymize else ''}ECC endorsement certificate", file=logfile)
@@ -448,17 +466,45 @@ def certs_handler(args):
             if args.disable_anonymize:
                 data = get_cert("ek-ecc.cer", logfile, anonymize=False)
             else:
-                anonymized_ecc = get_anonymized_ecc("ek-ecc.cer", logfile)
+                anonymized_ecc = get_anonymized_key("ek-ecc.cer", logfile)
                 anonymized_cert = get_cert("ek-ecc.cer", logfile, anonymize=True)
                 data = anonymized_ecc + anonymized_cert
 
             with open(os.path.join(detail_dir, "Certs_ek-ecc.txt"), "w") as outfile:
                 outfile.write(data)
-        except:
+        except Exception as e:
             print("Could not obtain ECC endorsement certificate", file=logfile)
+            print(e, file=logfile)
 
         print("Removing output certificates", file=logfile)
         subprocess.run(['sudo', 'rm', '-f', 'ek-rsa.cer', 'ek-ecc.cer'], stdout=logfile, stderr=logfile)
+
+        print("Getting persistent handles", file=logfile)
+        try:
+            process = subprocess.run(['sudo', 'tpm2_getcap', '-T', args.with_tctii, '-c', 'handles-persistent'], capture_output=True).check_returncode()
+        except:
+            process = subprocess.run(['sudo', 'tpm2_getcap', '-T', args.with_tctii, 'handles-persistent'], capture_output=True)
+
+        print(process.stderr.decode(), file=logfile)
+        for handle in map(lambda x: x[2:], process.stdout.decode("utf-8").strip().split("\n")):
+            key_path = f"{handle}.pem"
+            print(f"Getting handle {handle}", file=logfile)
+            try:
+                process = subprocess.run(['tpm2_readpublic', '-c', handle, '-f', 'pem', '-o', key_path], stdout=subprocess.DEVNULL, stderr=logfile).check_returncode()
+                if args.disable_anonymize:
+                    data = get_key(key_path, logfile, anonymize=False)
+                else:
+                    anonymized_key = get_anonymized_key(key_path, logfile, cert=False)
+                    key = get_key(key_path, logfile, anonymize=True)
+                    data = anonymized_key + key
+
+                with open(os.path.join(detail_dir, f"Certs_{handle}.txt"), "w") as outfile:
+                    outfile.write(data)
+            except Exception as e:
+                print(f"Could not obtain handle {handle}", file=logfile)
+                print(e, file=logfile)
+
+            subprocess.run(['sudo', 'rm', '-f', key_path], stdout=logfile, stderr=logfile)
 
 
 def capability_handler(args):
