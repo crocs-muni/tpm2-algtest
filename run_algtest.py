@@ -342,11 +342,15 @@ def get_image_tag(detail_dir):
     return image_tag
 
 
-def get_anonymized_cert(cert_path, logfile=sys.stderr):
+def get_cert(cert_path, logfile=sys.stderr, anonymize=True):
     process = subprocess.run(['sudo', 'openssl', 'x509', '-in', cert_path, '-noout', '-text'], capture_output=True)
     print(process.stderr.decode(), file=logfile)
     process.check_returncode()
     data = process.stdout.decode().split("\n")
+
+    if anonymize is False:
+        return "\n".join(data)
+
     anonymize_depth = None
 
     output = ""
@@ -416,34 +420,52 @@ def system_info(args, detail_dir):
         print("Could not obtain system information")
 
 
-def capability_handler(args):
-    detail_dir = os.path.join(args.outdir, 'detail')
-    run_command = ['sudo', 'tpm2_getcap', '-T', args.with_tctii]
 
-    with open(os.path.join(detail_dir, "capability_log.txt"), "w") as logfile:
+def certs_handler(args):
+    detail_dir = os.path.join(args.outdir, 'detail')
+
+    with open(os.path.join(detail_dir, "certs_log.txt"), "w") as logfile:
         print("Running tpm2_getekcertificate", file=logfile)
         subprocess.run(['sudo', 'tpm2_getekcertificate', '-T', args.with_tctii, '-o', 'ek-rsa.cer', '-o', 'ek-ecc.cer'], stdout=logfile, stderr=logfile)
         try:
-            print("Anonymizing RSA endorsement certificate", file=logfile)
-            anonymized_rsa = get_anonymized_rsa("ek-rsa.cer", logfile)
-            anonymized_cert = get_anonymized_cert("ek-rsa.cer", logfile)
-            with open(os.path.join(detail_dir, "Capability_ek-rsa.txt"), "w") as outfile:
-                outfile.write(anonymized_rsa + anonymized_cert)
+            print(f"Getting {'anonymized ' if not args.disable_anonymize else ''}RSA endorsement certificate", file=logfile)
+
+            if args.disable_anonymize:
+                data = get_cert("ek-rsa.cer", logfile, anonymize=False)
+            else:
+                anonymized_rsa = get_anonymized_rsa("ek-rsa.cer", logfile)
+                anonymized_cert = get_cert("ek-rsa.cer", logfile, anonymize=True)
+                data = anonymized_rsa + anonymized_cert
+
+            with open(os.path.join(detail_dir, "Certs_ek-rsa.txt"), "w") as outfile:
+                outfile.write(data)
         except:
             print("Could not obtain RSA endorsement certificate", file=logfile)
 
         try:
-            print("Anonymizing ECC endorsement certificate", file=logfile)
-            anonymized_ecc = get_anonymized_ecc("ek-ecc.cer", logfile)
-            anonymized_cert = get_anonymized_cert("ek-ecc.cer", logfile)
-            with open(os.path.join(detail_dir, "Capability_ek-ecc.txt"), "w") as outfile:
-                outfile.write(anonymized_ecc + anonymized_cert)
+            print(f"Getting {'anonymized ' if not args.disable_anonymize else ''}ECC endorsement certificate", file=logfile)
+
+            if args.disable_anonymize:
+                data = get_cert("ek-ecc.cer", logfile, anonymize=False)
+            else:
+                anonymized_ecc = get_anonymized_ecc("ek-ecc.cer", logfile)
+                anonymized_cert = get_cert("ek-ecc.cer", logfile, anonymize=True)
+                data = anonymized_ecc + anonymized_cert
+
+            with open(os.path.join(detail_dir, "Certs_ek-ecc.txt"), "w") as outfile:
+                outfile.write(data)
         except:
             print("Could not obtain ECC endorsement certificate", file=logfile)
 
         print("Removing output certificates", file=logfile)
         subprocess.run(['sudo', 'rm', '-f', 'ek-rsa.cer', 'ek-ecc.cer'], stdout=logfile, stderr=logfile)
 
+
+def capability_handler(args):
+    detail_dir = os.path.join(args.outdir, 'detail')
+    run_command = ['sudo', 'tpm2_getcap', '-T', args.with_tctii]
+
+    with open(os.path.join(detail_dir, "capability_log.txt"), "w") as logfile:
         print("Running tpm2_pcrread", file=logfile)
         with open(os.path.join(detail_dir, "Capability_pcrread.txt"), 'w') as outfile:
             subprocess.run(['sudo', 'tpm2_pcrread', '-T', args.with_tctii], stdout=outfile, stderr=logfile)
@@ -544,27 +566,29 @@ def format_handler(args):
 
 
 def all_handler(args):
-    handlers_count = 5
+    handlers_count = 6
     set_status(args, 'Running all tests...')
     system_info(args, os.path.join(args.outdir, 'detail'))
     set_status(args, f'Collecting basic TPM info (1/{handlers_count})...')
     capability_handler(args)
+    set_status(args, f'Collecting {"anonymized " if not args.disable_anonymize else ""}persistent keys (2/{handlers_count})...')
+    certs_handler(args)
     default_num = args.num is None
     if default_num:
         args.num = 1000
-    set_status(args, f'Running cryptoops test (2/{handlers_count})...')
+    set_status(args, f'Running cryptoops test (3/{handlers_count})...')
     cryptoops_handler(args)
     if default_num:
         args.num = 16384
-    set_status(args, f'Running RNG test (3/{handlers_count})...')
+    set_status(args, f'Running RNG test (4/{handlers_count})...')
     rng_handler(args)
     if default_num:
         args.num = 1000
-    set_status(args, f'Running performance test (4/{handlers_count})...')
+    set_status(args, f'Running performance test (5/{handlers_count})...')
     perf_handler(args)
     if default_num:
         args.num = 1000
-    set_status(args, f'Running keygen test (5/{handlers_count})...')
+    set_status(args, f'Running keygen test (6/{handlers_count})...')
     keygen_handler(args)
     if default_num:
         args.num = None
@@ -576,27 +600,29 @@ def all_handler(args):
 
 
 def extensive_handler(args):
-    handlers_count = 5
+    handlers_count = 6
     set_status(args, 'Running all tests with extensive setting...')
     system_info(args, os.path.join(args.outdir, 'detail'))
     set_status(args, f'Collecting basic TPM info (1/{handlers_count})...')
     capability_handler(args)
+    set_status(args, f'Collecting {"anonymized " if not args.disable_anonymize else ""}persistent keys (2/{handlers_count})...')
+    certs_handler(args)
     default_num = args.num is None
     if default_num:
         args.num = 100000
-    set_status(args, f'Running cryptoops test (2/{handlers_count})...')
+    set_status(args, f'Running cryptoops test (3/{handlers_count})...')
     cryptoops_handler(args)
     if default_num:
         args.num = 524288
-    set_status(args, f'Running RNG test (3/{handlers_count})...')
+    set_status(args, f'Running RNG test (4/{handlers_count})...')
     rng_handler(args)
     if default_num:
         args.num = 1000
-    set_status(args, f'Running performance test (4/{handlers_count})...')
+    set_status(args, f'Running performance test (5/{handlers_count})...')
     perf_handler(args)
     if default_num:
         args.num = 100000
-    set_status(args, f'Running keygen test (5/{handlers_count})...')
+    set_status(args, f'Running keygen test (6/{handlers_count})...')
     keygen_handler(args)
     if default_num:
         args.num = None
@@ -890,6 +916,7 @@ def main():
     parser.add_argument('-c', '--command', type=str, required=False)
     parser.add_argument('-o', '--outdir', type=str, required=False, default='out')
     parser.add_argument('--with-image-tag', type=str, required=False, default=IMAGE_TAG)
+    parser.add_argument('--disable-anonymize', action='store_true', default=False)
     parser.add_argument('--only-measure', action='store_true', default=False)
     parser.add_argument('--include-legacy', action='store_true', default=False)
     parser.add_argument('--machine-readable-statuses', action='store_true', default=False)
@@ -905,6 +932,7 @@ def main():
 
     COMMANDS = {
         "capability": capability_handler,
+        "certs": certs_handler,
         "keygen": keygen_handler,
         "perf": perf_handler,
         "cryptoops": cryptoops_handler,
