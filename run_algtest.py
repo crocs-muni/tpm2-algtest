@@ -19,7 +19,7 @@ from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicKey
 
 DEVICE = '/dev/tpm0'
-IMAGE_TAG = 'v2.2'
+IMAGE_TAG = 'v2.3'
 
 
 def get_algtest(args):
@@ -342,11 +342,7 @@ def get_image_tag(detail_dir):
     return image_tag
 
 
-def get_anonymized_cert(cert_path, logfile=sys.stderr):
-    process = subprocess.run(['sudo', 'openssl', 'x509', '-in', cert_path, '-noout', '-text'], capture_output=True)
-    print(process.stderr.decode(), file=logfile)
-    process.check_returncode()
-    data = process.stdout.decode().split("\n")
+def anonymize_blocks(data, blocks=[]):
     anonymize_depth = None
 
     output = ""
@@ -358,43 +354,68 @@ def get_anonymized_cert(cert_path, logfile=sys.stderr):
                 break
             depth += 1
 
-        if anonymize_depth is None and "Modulus" in line or "pub" in line or "Serial Number" in line or "Subject Alternative Name" in line or "Signature Value" in line or "Subject Key Identifier" in line:
+        if anonymize_depth is None and any(map(lambda x: x in line, blocks)):
             anonymized += 1
             anonymize_depth = depth
             output += line + "\n"
             continue
 
-        if anonymize_depth and depth > anonymize_depth:
+        if anonymize_depth is not None and depth > anonymize_depth:
             output += "".join(map(lambda x: x if x in " :" else "X", line)) + "\n"
             continue
 
         output += line + "\n"
         anonymize_depth = None
+    return anonymized, output
+
+
+def get_cert(cert_path, logfile=sys.stderr, anonymize=True):
+    process = subprocess.run(['sudo', 'openssl', 'x509', '-in', cert_path, '-noout', '-text'], capture_output=True)
+    print(process.stderr.decode(), file=logfile)
+    process.check_returncode()
+    data = process.stdout.decode().split("\n")
+
+    if anonymize is False:
+        return "\n".join(data)
+
+    anonymized, output = anonymize_blocks(data, ["Modulus", "pub", "Serial Number", "Subject Alternative Name", "Signature Value", "Subject Key Identifier"])
 
     return output if anonymized >= 3 else ""
 
 
-def get_anonymized_ecc(cert_path, logfile=sys.stderr):
-    process = subprocess.run(['sudo', 'openssl', 'x509', '-in', cert_path, '-noout', '-pubkey'], capture_output=True)
+def get_key(key_path, logfile=sys.stderr, anonymize=True):
+    process = subprocess.run(['sudo', 'openssl', 'pkey', '-pubin', '-in', key_path, '-noout', '-text'], capture_output=True)
     print(process.stderr.decode(), file=logfile)
     process.check_returncode()
-    data = process.stdout
-    key = load_pem_public_key(data)
-    assert isinstance(key, EllipticCurvePublicKey)
-    point = binascii.hexlify(key.public_bytes(Encoding.X962, PublicFormat.CompressedPoint)).decode()
-    return f"Anonymized:\n  pub prefix: {point[:6]}\n  pub suffix: {point[-4:]}\n"
+    data = process.stdout.decode().split("\n")
+
+    if anonymize is False:
+        return "\n".join(data)
+
+    anonymized, output = anonymize_blocks(data, ["Modulus"])
+
+    return output if anonymized >= 1 else ""
 
 
-def get_anonymized_rsa(cert_path, logfile=sys.stderr):
-    process = subprocess.run(['sudo', 'openssl', 'x509', '-in', cert_path, '-noout', '-pubkey'], capture_output=True)
-    print(process.stderr.decode(), file=logfile)
-    process.check_returncode()
-    data = process.stdout
+def get_anonymized_key(path, logfile=sys.stderr, cert=True):
+    if cert:
+        process = subprocess.run(['sudo', 'openssl', 'x509', '-in', path, '-noout', '-pubkey'], capture_output=True)
+        print(process.stderr.decode(), file=logfile)
+        process.check_returncode()
+        data = process.stdout
+    else:
+        with open(path, "r") as f:
+            data = f.read().encode("utf-8")
+
     key = load_pem_public_key(data)
-    assert isinstance(key, RSAPublicKey)
-    n = key.public_numbers().n
-    n = binascii.hexlify(int.to_bytes(n, length=(math.floor(math.log2(n)) // 8) + 1, byteorder="big")).decode()
-    return f"Anonymized:\n  n prefix: {n[:4]}\n  n suffix: {n[-4:]}\n"
+    if isinstance(key, RSAPublicKey):
+        n = key.public_numbers().n
+        n = binascii.hexlify(int.to_bytes(n, length=(math.floor(math.log2(n)) // 8) + 1, byteorder="big")).decode()
+        return f"Anonymized:\n  n prefix: {n[:4]}\n  n suffix: {n[-4:]}\n"
+    if isinstance(key, EllipticCurvePublicKey):
+        point = binascii.hexlify(key.public_bytes(Encoding.X962, PublicFormat.CompressedPoint)).decode()
+        return f"Anonymized:\n  pub prefix: {point[:6]}\n  pub suffix: {point[-4:]}\n"
+    return ""
 
 
 def system_info(args, detail_dir):
@@ -416,34 +437,81 @@ def system_info(args, detail_dir):
         print("Could not obtain system information")
 
 
+
+def certs_handler(args):
+    detail_dir = os.path.join(args.outdir, 'detail')
+
+    with open(os.path.join(detail_dir, "certs_log.txt"), "w") as logfile:
+        print("Running tpm2_getekcertificate", file=logfile)
+        subprocess.run(['sudo', 'tpm2_getekcertificate', '-T', args.with_tctii, '-o', 'ek-rsa.cer', '-o', 'ek-ecc.cer'], stdout=logfile, stderr=logfile)
+        try:
+            print(f"Getting {'anonymized ' if not args.disable_anonymize else ''}RSA endorsement certificate", file=logfile)
+
+            if args.disable_anonymize:
+                data = get_cert("ek-rsa.cer", logfile, anonymize=False)
+            else:
+                anonymized_rsa = get_anonymized_key("ek-rsa.cer", logfile)
+                anonymized_cert = get_cert("ek-rsa.cer", logfile, anonymize=True)
+                data = anonymized_rsa + anonymized_cert
+
+            with open(os.path.join(detail_dir, "Certs_ek-rsa.txt"), "w") as outfile:
+                outfile.write(data)
+        except Exception as e:
+            print("Could not obtain RSA endorsement certificate", file=logfile)
+            print(e, file=logfile)
+
+        try:
+            print(f"Getting {'anonymized ' if not args.disable_anonymize else ''}ECC endorsement certificate", file=logfile)
+
+            if args.disable_anonymize:
+                data = get_cert("ek-ecc.cer", logfile, anonymize=False)
+            else:
+                anonymized_ecc = get_anonymized_key("ek-ecc.cer", logfile)
+                anonymized_cert = get_cert("ek-ecc.cer", logfile, anonymize=True)
+                data = anonymized_ecc + anonymized_cert
+
+            with open(os.path.join(detail_dir, "Certs_ek-ecc.txt"), "w") as outfile:
+                outfile.write(data)
+        except Exception as e:
+            print("Could not obtain ECC endorsement certificate", file=logfile)
+            print(e, file=logfile)
+
+        print("Removing output certificates", file=logfile)
+        subprocess.run(['sudo', 'rm', '-f', 'ek-rsa.cer', 'ek-ecc.cer'], stdout=logfile, stderr=logfile)
+
+        print("Getting persistent handles", file=logfile)
+        try:
+            process = subprocess.run(['sudo', 'tpm2_getcap', '-T', args.with_tctii, '-c', 'handles-persistent'], capture_output=True).check_returncode()
+        except:
+            process = subprocess.run(['sudo', 'tpm2_getcap', '-T', args.with_tctii, 'handles-persistent'], capture_output=True)
+
+        print(process.stderr.decode(), file=logfile)
+        for handle in map(lambda x: x[2:], process.stdout.decode("utf-8").strip().split("\n")):
+            key_path = f"{handle}.pem"
+            print(f"Getting handle {handle}", file=logfile)
+            try:
+                process = subprocess.run(['tpm2_readpublic', '-c', handle, '-f', 'pem', '-o', key_path], stdout=subprocess.DEVNULL, stderr=logfile).check_returncode()
+                if args.disable_anonymize:
+                    data = get_key(key_path, logfile, anonymize=False)
+                else:
+                    anonymized_key = get_anonymized_key(key_path, logfile, cert=False)
+                    key = get_key(key_path, logfile, anonymize=True)
+                    data = anonymized_key + key
+
+                with open(os.path.join(detail_dir, f"Certs_{handle}.txt"), "w") as outfile:
+                    outfile.write(data)
+            except Exception as e:
+                print(f"Could not obtain handle {handle}", file=logfile)
+                print(e, file=logfile)
+
+            subprocess.run(['sudo', 'rm', '-f', key_path], stdout=logfile, stderr=logfile)
+
+
 def capability_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
     run_command = ['sudo', 'tpm2_getcap', '-T', args.with_tctii]
 
     with open(os.path.join(detail_dir, "capability_log.txt"), "w") as logfile:
-        print("Running tpm2_getekcertificate", file=logfile)
-        subprocess.run(['sudo', 'tpm2_getekcertificate', '-T', args.with_tctii, '-o', 'ek-rsa.cer', '-o', 'ek-ecc.cer'], stdout=logfile, stderr=logfile)
-        try:
-            print("Anonymizing RSA endorsement certificate", file=logfile)
-            anonymized_rsa = get_anonymized_rsa("ek-rsa.cer", logfile)
-            anonymized_cert = get_anonymized_cert("ek-rsa.cer", logfile)
-            with open(os.path.join(detail_dir, "Capability_ek-rsa.txt"), "w") as outfile:
-                outfile.write(anonymized_rsa + anonymized_cert)
-        except:
-            print("Could not obtain RSA endorsement certificate", file=logfile)
-
-        try:
-            print("Anonymizing ECC endorsement certificate", file=logfile)
-            anonymized_ecc = get_anonymized_ecc("ek-ecc.cer", logfile)
-            anonymized_cert = get_anonymized_cert("ek-ecc.cer", logfile)
-            with open(os.path.join(detail_dir, "Capability_ek-ecc.txt"), "w") as outfile:
-                outfile.write(anonymized_ecc + anonymized_cert)
-        except:
-            print("Could not obtain ECC endorsement certificate", file=logfile)
-
-        print("Removing output certificates", file=logfile)
-        subprocess.run(['sudo', 'rm', '-f', 'ek-rsa.cer', 'ek-ecc.cer'], stdout=logfile, stderr=logfile)
-
         print("Running tpm2_pcrread", file=logfile)
         with open(os.path.join(detail_dir, "Capability_pcrread.txt"), 'w') as outfile:
             subprocess.run(['sudo', 'tpm2_pcrread', '-T', args.with_tctii], stdout=outfile, stderr=logfile)
@@ -544,27 +612,29 @@ def format_handler(args):
 
 
 def all_handler(args):
-    handlers_count = 5
+    handlers_count = 6
     set_status(args, 'Running all tests...')
     system_info(args, os.path.join(args.outdir, 'detail'))
     set_status(args, f'Collecting basic TPM info (1/{handlers_count})...')
     capability_handler(args)
+    set_status(args, f'Collecting {"anonymized " if not args.disable_anonymize else ""}persistent keys (2/{handlers_count})...')
+    certs_handler(args)
     default_num = args.num is None
     if default_num:
         args.num = 1000
-    set_status(args, f'Running cryptoops test (2/{handlers_count})...')
+    set_status(args, f'Running cryptoops test (3/{handlers_count})...')
     cryptoops_handler(args)
     if default_num:
         args.num = 16384
-    set_status(args, f'Running RNG test (3/{handlers_count})...')
+    set_status(args, f'Running RNG test (4/{handlers_count})...')
     rng_handler(args)
     if default_num:
         args.num = 1000
-    set_status(args, f'Running performance test (4/{handlers_count})...')
+    set_status(args, f'Running performance test (5/{handlers_count})...')
     perf_handler(args)
     if default_num:
         args.num = 1000
-    set_status(args, f'Running keygen test (5/{handlers_count})...')
+    set_status(args, f'Running keygen test (6/{handlers_count})...')
     keygen_handler(args)
     if default_num:
         args.num = None
@@ -576,27 +646,29 @@ def all_handler(args):
 
 
 def extensive_handler(args):
-    handlers_count = 5
+    handlers_count = 6
     set_status(args, 'Running all tests with extensive setting...')
     system_info(args, os.path.join(args.outdir, 'detail'))
     set_status(args, f'Collecting basic TPM info (1/{handlers_count})...')
     capability_handler(args)
+    set_status(args, f'Collecting {"anonymized " if not args.disable_anonymize else ""}persistent keys (2/{handlers_count})...')
+    certs_handler(args)
     default_num = args.num is None
     if default_num:
         args.num = 100000
-    set_status(args, f'Running cryptoops test (2/{handlers_count})...')
+    set_status(args, f'Running cryptoops test (3/{handlers_count})...')
     cryptoops_handler(args)
     if default_num:
         args.num = 524288
-    set_status(args, f'Running RNG test (3/{handlers_count})...')
+    set_status(args, f'Running RNG test (4/{handlers_count})...')
     rng_handler(args)
     if default_num:
         args.num = 1000
-    set_status(args, f'Running performance test (4/{handlers_count})...')
+    set_status(args, f'Running performance test (5/{handlers_count})...')
     perf_handler(args)
     if default_num:
         args.num = 100000
-    set_status(args, f'Running keygen test (5/{handlers_count})...')
+    set_status(args, f'Running keygen test (6/{handlers_count})...')
     keygen_handler(args)
     if default_num:
         args.num = None
@@ -890,6 +962,7 @@ def main():
     parser.add_argument('-c', '--command', type=str, required=False)
     parser.add_argument('-o', '--outdir', type=str, required=False, default='out')
     parser.add_argument('--with-image-tag', type=str, required=False, default=IMAGE_TAG)
+    parser.add_argument('--disable-anonymize', action='store_true', default=False)
     parser.add_argument('--only-measure', action='store_true', default=False)
     parser.add_argument('--include-legacy', action='store_true', default=False)
     parser.add_argument('--machine-readable-statuses', action='store_true', default=False)
@@ -905,6 +978,7 @@ def main():
 
     COMMANDS = {
         "capability": capability_handler,
+        "certs": certs_handler,
         "keygen": keygen_handler,
         "perf": perf_handler,
         "cryptoops": cryptoops_handler,
