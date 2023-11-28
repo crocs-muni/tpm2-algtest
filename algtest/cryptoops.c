@@ -182,6 +182,13 @@ bool run_ecc_sign(
         export_keypair(sapi_context, primary_handle, &outPublic, &outPrivate, &keypair);
     }
 
+    TPM2B_DIGEST digest = scenario->sign.digest;
+    digest.size = scenario->sign.digest.size;
+    memcpy(digest.buffer, scenario->sign.digest.buffer, digest.size);
+
+    FILE* input_file = fopen("input.bin", "rb");
+    srand(0);
+
     int failures = 0;
     result->size = 0;
     struct timespec start, end;
@@ -195,10 +202,18 @@ bool run_ecc_sign(
             break;
         }
 
+        if(scenario->parameters.input_type == INPUT_TYPE_RANDOM) {
+            for(uint16_t j = 0; j < digest.size; ++j) {
+                digest.buffer[j] = rand() % 256;
+            }
+        } else if (scenario->parameters.input_type == INPUT_TYPE_FILE) {
+            read_cyclic(input_file, digest.buffer, digest.size);
+        }
+
         TPMT_SIGNATURE signature;
         TPM2B_ECC_POINT nonce_point = { .size = 0 };
         result->data_points[i].rc = sign(sapi_context, object_handle,
-                &scenario->sign.scheme, &scenario->sign.digest, &signature, &nonce_point,
+                &scenario->sign.scheme, &digest, &signature, &nonce_point,
                 &result->data_points[i].duration_s, &result->data_points[i].duration_extra_s);
 
         result->data_points[i].ecc.algorithm_id = scenario->sign.scheme.scheme;
@@ -225,8 +240,8 @@ bool run_ecc_sign(
                 default:
                     log_warning("Cryptoops ecc: Unknown signature algorithm %04x", signature.sigAlg);
             }
-            result->data_points[i].ecc.digest_size = scenario->sign.digest.size;
-            memcpy(&result->data_points[i].ecc.digest, scenario->sign.digest.buffer, scenario->sign.digest.size);
+            result->data_points[i].ecc.digest_size = digest.size;
+            memcpy(&result->data_points[i].ecc.digest, digest.buffer, digest.size);
 
             if(r) {
                 result->data_points[i].ecc.signature_r_size = r->size;
@@ -268,10 +283,14 @@ bool run_ecc_sign(
 	    if(failures >= FAILURE_LIMIT) {
 	        log_error("Cryptoops ecc: Too many failures. Skipping remaining iterations.");
 	        skip_progress(prog, scenario->parameters.repetitions - i - 1);
+            if (input_file)
+                fclose(input_file);
             Tss2_Sys_FlushContext(sapi_context, object_handle);
             return false;
 	    }
     }
+    if (input_file)
+        fclose(input_file);
 
     Tss2_Sys_FlushContext(sapi_context, object_handle);
     return true;
@@ -336,6 +355,12 @@ bool run_rsa_sign(
         export_keypair(sapi_context, primary_handle, &outPublic, &outPrivate, &keypair);
     }
 
+    TPM2B_DIGEST digest = scenario->sign.digest;
+    digest.size = scenario->sign.digest.size;
+    memcpy(digest.buffer, scenario->sign.digest.buffer, digest.size);
+
+    FILE* input_file = fopen("input.bin", "rb");
+    srand(0);
 
     int failures = 0;
     result->size = 0;
@@ -350,9 +375,17 @@ bool run_rsa_sign(
             break;
         }
 
+        if(scenario->parameters.input_type == INPUT_TYPE_RANDOM) {
+            for(uint16_t j = 0; j < digest.size; ++j) {
+                digest.buffer[j] = rand() % 256;
+            }
+        } else if (scenario->parameters.input_type == INPUT_TYPE_FILE) {
+            read_cyclic(input_file, digest.buffer, digest.size);
+        }
+
         TPMT_SIGNATURE signature;
         result->data_points[i].rc = sign(sapi_context, object_handle,
-                                         &scenario->sign.scheme, &scenario->sign.digest, &signature, NULL,
+                                         &scenario->sign.scheme, &digest, &signature, NULL,
                                          &result->data_points[i].duration_s, &result->data_points[i].duration_extra_s);
 
         if(result->data_points[i].rc == TPM2_RC_SUCCESS) {
@@ -371,8 +404,8 @@ bool run_rsa_sign(
                     log_warning("Cryptoops rsa: Unknown signature algorithm %04x", signature.sigAlg);
             }
             result->data_points[i].rsa.algorithm_id = signature.sigAlg;
-            result->data_points[i].rsa.digest_size = scenario->sign.digest.size;
-            memcpy(&result->data_points[i].rsa.digest, scenario->sign.digest.buffer, scenario->sign.digest.size);
+            result->data_points[i].rsa.digest_size = digest.size;
+            memcpy(&result->data_points[i].rsa.digest, digest.buffer, digest.size);
 
             if(hash) {
                 result->data_points[i].rsa.hash_id = *hash;
@@ -402,10 +435,14 @@ bool run_rsa_sign(
         if(failures >= FAILURE_LIMIT) {
             log_error("Cryptoops rsa: Too many failures. Skipping remaining iterations.");
             skip_progress(prog, scenario->parameters.repetitions - i - 1);
+            if (input_file)
+                fclose(input_file);
             Tss2_Sys_FlushContext(sapi_context, object_handle);
             return false;
         }
     }
+    if (input_file)
+        fclose(input_file);
 
     Tss2_Sys_FlushContext(sapi_context, object_handle);
     return true;

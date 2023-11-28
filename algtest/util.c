@@ -41,3 +41,20 @@ FILE *open_bin(const char *filename)
     }
     return file;
 }
+
+int read_cyclic(FILE *fp, char *buffer, size_t size)
+{
+    size_t bytes_read = 0;
+    while (bytes_read < size) {
+        size_t bytes_to_read = size - bytes_read;
+        size_t bytes_read_now = fread(buffer + bytes_read, 1, bytes_to_read, fp);
+        if (bytes_read_now == 0 && feof(fp)) {
+            if (ftell(fp) == 0) {
+                return 0;
+            }
+            fseek(fp, 0, SEEK_SET);
+        }
+        bytes_read += bytes_read_now;
+    }
+    return bytes_read;
+}

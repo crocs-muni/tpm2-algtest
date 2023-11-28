@@ -11,4 +11,5 @@ void set_parameters_from_options(struct scenario_parameters *parameters)
     if (options.max_duration_s) {
         parameters->max_duration_s = options.max_duration_s;
     }
+    parameters->input_type = options.input_type;
 }

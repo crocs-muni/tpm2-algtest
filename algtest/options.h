@@ -2,6 +2,12 @@
 #include <tss2/tss2_sys.h>
 #include <stdbool.h>
 
+typedef enum INPUT_TYPE {
+    INPUT_TYPE_STATIC,
+    INPUT_TYPE_RANDOM,
+    INPUT_TYPE_FILE,
+} INPUT_TYPE;
+
 struct tpm_algtest_options {
     int repetitions;
     int max_duration_s;
@@ -14,6 +20,7 @@ struct tpm_algtest_options {
     int curveid;
     int verbose;
     char* outdir;
+    INPUT_TYPE input_type;
 };
 
 bool scenario_in_options(const char* scenario);
