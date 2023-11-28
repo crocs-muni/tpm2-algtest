@@ -147,6 +147,13 @@ bool run_perf_sign(
         return false;
     }
 
+    TPM2B_DIGEST digest = scenario->sign.digest;
+    digest.size = scenario->sign.digest.size;
+    memcpy(digest.buffer, scenario->sign.digest.buffer, digest.size);
+
+    FILE* input_file = fopen("input.bin", "rb");
+    srand(0);
+
     int failures = 0;
     result->size = 0;
     struct timespec start, end;
@@ -158,6 +165,16 @@ bool run_perf_sign(
             log_error("Perf sign: Max duration reached. Skipping remaining iterations.");
             skip_progress(prog, scenario->parameters.repetitions - i);
             break;
+        }
+        
+        if(i % 5 == 0) {
+            if(scenario->parameters.input_type == INPUT_TYPE_RANDOM) {
+                for(uint16_t j = 0; j < digest.size; ++j) {
+                    digest.buffer[j] = rand() % 256;
+                }
+            } else if (scenario->parameters.input_type == INPUT_TYPE_FILE) {
+                read_cyclic(input_file, digest.buffer, digest.size);
+            }
         }
 
         TPMT_SIGNATURE signature;
@@ -187,10 +204,14 @@ bool run_perf_sign(
         if(failures >= FAILURE_LIMIT) {
             log_error("Perf sign: Too many failures. Skipping remaining iterations.");
             skip_progress(prog, scenario->parameters.repetitions - i - 1);
+            if (input_file)
+                fclose(input_file);
             Tss2_Sys_FlushContext(sapi_context, object_handle);
             return false;
         }
     }
+    if (input_file)
+        fclose(input_file);
 
     Tss2_Sys_FlushContext(sapi_context, object_handle);
     return true;
@@ -224,21 +245,12 @@ bool run_perf_verifysignature(
     }
 
     TPMT_SIGNATURE signature;
-    rc = sign(sapi_context, object_handle, &scenario->verifysignature.scheme,
-            &scenario->verifysignature.digest, &signature, NULL, NULL, NULL);
+    TPM2B_DIGEST digest = scenario->verifysignature.digest;
+    digest.size = scenario->verifysignature.digest.size;
+    memcpy(digest.buffer, scenario->verifysignature.digest.buffer, digest.size);
 
-    if (rc != TPM2_RC_SUCCESS) {
-        if (scenario->verifysignature.key_params.type == TPM2_ALG_RSA) {
-            log_info("Perf verifysignature: Could not create signature RSA | keybits %d | scheme %04x | rc %04x", scenario->verifysignature.key_params.parameters.rsaDetail.keyBits, scenario->verifysignature.scheme.scheme, rc);
-        } else if (scenario->verifysignature.key_params.type == TPM2_ALG_ECC) {
-            log_info("Perf verifysignature: Could not create signature ECC | curve %04x | scheme %04x | rc %04x", scenario->verifysignature.key_params.parameters.eccDetail.curveID, scenario->verifysignature.scheme.scheme, rc);
-        } else {
-            log_error("Perf verifysignature: Could not create signature type %04x | scheme %04x | rc %04x", scenario->verifysignature.key_params.type, scenario->verifysignature.scheme.scheme, rc);
-        }
-        skip_progress(prog, scenario->parameters.repetitions);
-        Tss2_Sys_FlushContext(sapi_context, object_handle);
-        return false;
-    }
+    FILE* input_file = fopen("input.bin", "rb");
+    srand(0);
 
     int failures = 0;
     result->size = 0;
@@ -251,6 +263,34 @@ bool run_perf_verifysignature(
             log_error("Perf verifysignature: Max duration reached. Skipping remaining iterations.");
             skip_progress(prog, scenario->parameters.repetitions - i);
             break;
+        }
+
+        if (i % 5 == 0) {
+            if(scenario->parameters.input_type == INPUT_TYPE_RANDOM) {
+                for(uint16_t j = 0; j < digest.size; ++j) {
+                    digest.buffer[j] = rand() % 256;
+                }
+            } else if (scenario->parameters.input_type == INPUT_TYPE_FILE) {
+                read_cyclic(input_file, digest.buffer, digest.size);
+            }
+
+            rc = sign(sapi_context, object_handle, &scenario->verifysignature.scheme,
+                    &scenario->verifysignature.digest, &signature, NULL, NULL, NULL);
+
+            if (rc != TPM2_RC_SUCCESS) {
+                if (scenario->verifysignature.key_params.type == TPM2_ALG_RSA) {
+                    log_info("Perf verifysignature: Could not create signature RSA | keybits %d | scheme %04x | rc %04x", scenario->verifysignature.key_params.parameters.rsaDetail.keyBits, scenario->verifysignature.scheme.scheme, rc);
+                } else if (scenario->verifysignature.key_params.type == TPM2_ALG_ECC) {
+                    log_info("Perf verifysignature: Could not create signature ECC | curve %04x | scheme %04x | rc %04x", scenario->verifysignature.key_params.parameters.eccDetail.curveID, scenario->verifysignature.scheme.scheme, rc);
+                } else {
+                    log_error("Perf verifysignature: Could not create signature type %04x | scheme %04x | rc %04x", scenario->verifysignature.key_params.type, scenario->verifysignature.scheme.scheme, rc);
+                }
+                skip_progress(prog, scenario->parameters.repetitions - i);
+                if (input_file)
+                    fclose(input_file);
+                Tss2_Sys_FlushContext(sapi_context, object_handle);
+                return false;
+            }
         }
 
         result->data_points[i].rc = verifysignature(sapi_context, object_handle,
@@ -279,10 +319,15 @@ bool run_perf_verifysignature(
         if(failures >= FAILURE_LIMIT) {
             log_error("Perf verifysignature: Too many failures. Skipping remaining iterations.");
             skip_progress(prog, scenario->parameters.repetitions - i - 1);
+            if (input_file)
+                fclose(input_file);
             Tss2_Sys_FlushContext(sapi_context, object_handle);
             return false;
         }
     }
+    if (input_file)
+        fclose(input_file);
+
     Tss2_Sys_FlushContext(sapi_context, object_handle);
     return true;
 }
@@ -309,6 +354,13 @@ bool run_perf_rsa_encrypt(
         return false;
     }
 
+    TPM2B_PUBLIC_KEY_RSA message = scenario->rsa_encrypt.message;
+    message.size = scenario->rsa_encrypt.message.size;
+    memcpy(message.buffer, scenario->rsa_encrypt.message.buffer, message.size);
+
+    FILE* input_file = fopen("input.bin", "rb");
+    srand(0);
+
     int failures = 0;
     result->size = 0;
     struct timespec start, end;
@@ -320,6 +372,16 @@ bool run_perf_rsa_encrypt(
             log_error("Perf rsa_encrypt: Max duration reached. Skipping remaining iterations.");
             skip_progress(prog, scenario->parameters.repetitions - i);
             break;
+        }
+
+        if (i % 5 == 0) {
+            if(scenario->parameters.input_type == INPUT_TYPE_RANDOM) {
+                for(uint16_t j = 0; j < message.size; ++j) {
+                    message.buffer[j] = rand() % 256;
+                }
+            } else if (scenario->parameters.input_type == INPUT_TYPE_FILE) {
+                read_cyclic(input_file, message.buffer, message.size);
+            }
         }
 
         TPM2B_PUBLIC_KEY_RSA outData;
@@ -340,10 +402,15 @@ bool run_perf_rsa_encrypt(
         if(failures >= FAILURE_LIMIT) {
             log_error("Perf rsa_encrypt: Too many failures. Skipping remaining iterations.");
             skip_progress(prog, scenario->parameters.repetitions - i - 1);
+            if (input_file)
+                fclose(input_file);
             Tss2_Sys_FlushContext(sapi_context, object_handle);
             return false;
         }
     }
+    if (input_file)
+        fclose(input_file);
+
     Tss2_Sys_FlushContext(sapi_context, object_handle);
     return true;
 }
@@ -371,8 +438,12 @@ bool run_perf_rsa_decrypt(
     }
 
     TPM2B_PUBLIC_KEY_RSA ciphertext = { .size = 0 };
-    rsa_encrypt(sapi_context, object_handle, &scenario->rsa_decrypt.message,
-            &scenario->rsa_decrypt.scheme, &ciphertext, NULL);
+    TPM2B_PUBLIC_KEY_RSA message = scenario->rsa_decrypt.message;
+    message.size = scenario->rsa_decrypt.message.size;
+    memcpy(message.buffer, scenario->rsa_decrypt.message.buffer, message.size);
+
+    FILE* input_file = fopen("input.bin", "rb");
+    srand(0);
 
     int failures;
     result->size = 0;
@@ -385,6 +456,19 @@ bool run_perf_rsa_decrypt(
             log_error("Perf rsa_decrypt: Max duration reached. Skipping remaining iterations.");
             skip_progress(prog, scenario->parameters.repetitions - i);
             break;
+        }
+
+        if (i % 5 == 0) {
+            if(scenario->parameters.input_type == INPUT_TYPE_RANDOM) {
+                for(uint16_t j = 0; j < message.size; ++j) {
+                    message.buffer[j] = rand() % 256;
+                }
+            } else if (scenario->parameters.input_type == INPUT_TYPE_FILE) {
+                read_cyclic(input_file, message.buffer, message.size);
+            }
+
+            rsa_encrypt(sapi_context, object_handle, &message,
+                        &scenario->rsa_decrypt.scheme, &ciphertext, NULL);
         }
 
         TPM2B_PUBLIC_KEY_RSA decrypted_message;
@@ -405,10 +489,15 @@ bool run_perf_rsa_decrypt(
         if(failures >= FAILURE_LIMIT) {
             log_error("Perf rsa_decrypt: Too many failures. Skipping remaining iterations.");
             skip_progress(prog, scenario->parameters.repetitions - i - 1);
+            if (input_file)
+                fclose(input_file);
             Tss2_Sys_FlushContext(sapi_context, object_handle);
             return false;
         }
     }
+    if (input_file)
+        fclose(input_file);
+
     Tss2_Sys_FlushContext(sapi_context, object_handle);
     return true;
 }
@@ -460,6 +549,9 @@ bool run_perf_encryptdecrypt(
                                      scenario->encryptdecrypt.decrypt, &inIv, &inData,
                                      NULL, false) == TPM2_RC_COMMAND_CODE;
 
+    FILE* input_file = fopen("input.bin", "rb");
+    srand(0);
+
     int failures = 0;
     result->size = 0;
     struct timespec start, end;
@@ -471,6 +563,20 @@ bool run_perf_encryptdecrypt(
             log_error("Perf encryptdecrypt: Max duration reached. Skipping remaining iterations.");
             skip_progress(prog, scenario->parameters.repetitions - i);
             break;
+        }
+
+        if (i % 5 == 0) {
+            if(scenario->parameters.input_type == INPUT_TYPE_RANDOM) {
+                for(uint16_t j = 0; j < inIv.size; ++j) {
+                    inIv.buffer[j] = rand() % 256;
+                }
+                for(uint16_t j = 0; j < inData.size; ++j) {
+                    inData.buffer[j] = rand() % 256;
+                }
+            } else if (scenario->parameters.input_type == INPUT_TYPE_FILE) {
+                read_cyclic(input_file, inIv.buffer, inIv.size);
+                read_cyclic(input_file, inData.buffer, inData.size);
+            }
         }
 
         result->data_points[i].rc = encryptdecrypt(sapi_context, object_handle,
@@ -494,10 +600,15 @@ bool run_perf_encryptdecrypt(
         if(failures >= FAILURE_LIMIT) {
             log_error("Perf encryptdecrypt: Too many failures. Skipping remaining iterations.");
             skip_progress(prog, scenario->parameters.repetitions - i - 1);
+            if (input_file)
+                fclose(input_file);
             Tss2_Sys_FlushContext(sapi_context, object_handle);
             return false;
         }
     }
+    if (input_file)
+        fclose(input_file);
+
     Tss2_Sys_FlushContext(sapi_context, object_handle);
     return true;
 }
@@ -536,13 +647,16 @@ bool run_perf_hmac(
         return false;
     }
 
+    TPM2B_MAX_BUFFER buffer = { .size = 256 };
+    memset(&buffer.buffer, 0x00, buffer.size);
+
+    FILE* input_file = fopen("input.bin", "rb");
+    srand(0);
+
     int failures = 0;
     result->size = 0;
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
-
-    TPM2B_MAX_BUFFER buffer = { .size = 256 };
-    memset(&buffer.buffer, 0x00, buffer.size);
 
     for (unsigned i = 0; i < scenario->parameters.repetitions; ++i) {
         clock_gettime(CLOCK_MONOTONIC, &end);
@@ -550,6 +664,16 @@ bool run_perf_hmac(
             log_error("Perf hmac: Max duration reached. Skipping remaining iterations.");
             skip_progress(prog, scenario->parameters.repetitions - i);
             break;
+        }
+
+        if (i % 5 == 0) {
+            if(scenario->parameters.input_type == INPUT_TYPE_RANDOM) {
+                for(uint16_t j = 0; j < buffer.size; ++j) {
+                    buffer.buffer[j] = rand() % 256;
+                }
+            } else if (scenario->parameters.input_type == INPUT_TYPE_FILE) {
+                read_cyclic(input_file, buffer.buffer, buffer.size);
+            }
         }
 
         result->data_points[i].rc = hmac(sapi_context, object_handle, &buffer,
@@ -567,10 +691,14 @@ bool run_perf_hmac(
         if(failures >= FAILURE_LIMIT) {
             log_error("Perf hmac: Too many failures. Skipping remaining iterations.");
             skip_progress(prog, scenario->parameters.repetitions - i - 1);
+            if (input_file)
+                fclose(input_file);
             Tss2_Sys_FlushContext(sapi_context, object_handle);
             return false;
         }
     }
+    if (input_file)
+        fclose(input_file);
 
     Tss2_Sys_FlushContext(sapi_context, object_handle);
     return true;
@@ -764,6 +892,10 @@ void run_perf_hash(
         return;
     }
 
+
+    FILE* input_file = fopen("input.bin", "rb");
+    srand(0);
+
     int failures = 0;
     result.size = 0;
     struct timespec start, end;
@@ -775,6 +907,16 @@ void run_perf_hash(
             log_error("Perf hash: Max duration reached. Skipping remaining iterations.");
             skip_progress(prog, scenario->parameters.repetitions - i);
             break;
+        }
+
+        if (i % 5 == 0) {
+            if(scenario->parameters.input_type == INPUT_TYPE_RANDOM) {
+                for(uint16_t j = 0; j < data.size; ++j) {
+                    data.buffer[j] = rand() % 256;
+                }
+            } else if (scenario->parameters.input_type == INPUT_TYPE_FILE) {
+                read_cyclic(input_file, data.buffer, data.size);
+            }
         }
 
         result.data_points[i].rc = hash(sapi_context, &data,
@@ -792,10 +934,14 @@ void run_perf_hash(
         if(failures >= FAILURE_LIMIT) {
             log_error("Perf hash: Too many failures. Skipping remaining iterations.");
             skip_progress(prog, scenario->parameters.repetitions - i - 1);
+            if (input_file)
+                fclose(input_file);
             free_result(&result);
             return;
         }
     }
+    if (input_file)
+        fclose(input_file);
 
     output_results(scenario, &result);
     free_result(&result);
@@ -815,9 +961,15 @@ unsigned long count_supported_perf_scenarios(
         scenario.sign = (struct perf_sign_scenario) {
             .key_params = { .type = TPM2_ALG_NULL },
             .scheme = { .scheme = TPM2_ALG_NULL },
-            .digest = { .size = 32 }, // Using SHA256
+            .digest = {
+                .size = 32,
+                .buffer = { 0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14,
+                            0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24,
+                            0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c,
+                            0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55
+                } // SHA256("")
+            }
         };
-        memset(&scenario.sign.digest.buffer, 0x00, scenario.sign.digest.size);
         while (get_next_asym_key_params(&scenario.sign.key_params)) {
             while (get_next_sign_scheme(&scenario.sign.scheme, scenario.sign.key_params.type)) {
                 TPM2B_PUBLIC inPublic = prepare_template(&scenario.sign.key_params);
@@ -836,9 +988,15 @@ unsigned long count_supported_perf_scenarios(
         scenario.verifysignature = (struct perf_verifysignature_scenario) {
             .key_params = { .type = TPM2_ALG_NULL },
             .scheme = { .scheme = TPM2_ALG_NULL },
-            .digest = { .size = 32 }, // Using SHA256
+            .digest = {
+                .size = 32,
+                .buffer = { 0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14,
+                            0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24,
+                            0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c,
+                            0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55
+                } // SHA256("")
+            }
         };
-        memset(&scenario.verifysignature.digest.buffer, 0x00, scenario.verifysignature.digest.size);
         while (get_next_asym_key_params(&scenario.verifysignature.key_params)) {
             do {
                 TPM2B_PUBLIC inPublic = prepare_template(&scenario.verifysignature.key_params);
@@ -1022,9 +1180,15 @@ void run_perf_scenarios(
         scenario.sign = (struct perf_sign_scenario) {
             .key_params = { .type = TPM2_ALG_NULL },
             .scheme = { .scheme = TPM2_ALG_NULL },
-            .digest = { .size = 32 }, // Using SHA256
+            .digest = {
+                .size = 32,
+                .buffer = { 0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14,
+                            0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24,
+                            0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c,
+                            0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55
+                } // SHA256("")
+            }
         };
-        memset(&scenario.sign.digest.buffer, 0x00, scenario.sign.digest.size);
         while (get_next_asym_key_params(&scenario.sign.key_params)) {
             while (get_next_sign_scheme(&scenario.sign.scheme, scenario.sign.key_params.type)) {
                 run_perf_on_primary(sapi_context, &scenario, primary_handle, &prog);
@@ -1038,9 +1202,15 @@ void run_perf_scenarios(
         scenario.verifysignature = (struct perf_verifysignature_scenario) {
             .key_params = { .type = TPM2_ALG_NULL },
             .scheme = { .scheme = TPM2_ALG_NULL },
-            .digest = { .size = 32 }, // Using SHA256
+            .digest = {
+                .size = 32,
+                .buffer = { 0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14,
+                            0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24,
+                            0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c,
+                            0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55
+                } // SHA256("")
+            }
         };
-        memset(&scenario.verifysignature.digest.buffer, 0x00, scenario.verifysignature.digest.size);
         while (get_next_asym_key_params(&scenario.verifysignature.key_params)) {
             do {
                 run_perf_on_primary(sapi_context, &scenario, primary_handle, &prog);
