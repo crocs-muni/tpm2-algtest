@@ -30,6 +30,7 @@ struct tpm_algtest_options options = {
     .curveid = TPM2_ECC_NONE,
     .verbose = TPM2_ALGTEST_VERBOSE_INFO,
     .outdir = "out",
+    .input_type = INPUT_TYPE_STATIC,
 };
 
 static
@@ -66,6 +67,23 @@ bool on_option(char key, char *value)
     case 'o':
         options.outdir = value;
         break;
+    case 'i':
+        if (strcmp(value, "static") == 0) {
+            options.input_type = INPUT_TYPE_STATIC;
+        } else if (strcmp(value, "random") == 0) {
+            options.input_type = INPUT_TYPE_RANDOM;
+        } else if (strcmp(value, "file") == 0) {
+            options.input_type = INPUT_TYPE_FILE;
+            FILE* f = fopen("input.bin", "rb");
+            if (f == NULL) {
+                perror("Cannot open input.bin file");
+                exit(1);
+            }
+            fclose(f);
+        } else {
+            return false;
+        }
+        break;
     }
     return true;
 }
@@ -82,8 +100,9 @@ bool tpm2_tool_onstart(tpm2_options **opts)
         { "algorithm", required_argument, NULL, 'a' },
         { "no_export", no_argument, NULL, 'x' },
         { "outdir", required_argument, NULL, 'o' },
+        { "input_type", required_argument, NULL, 'i' },
     };
-    *opts = tpm2_options_new("s:d:n:t:c:l:C:a:xo:", ARRAY_LEN(topts), topts, on_option, NULL, 0);
+    *opts = tpm2_options_new("s:d:n:t:c:l:C:a:xo:i:", ARRAY_LEN(topts), topts, on_option, NULL, 0);
 
     return *opts != NULL;
 }

@@ -56,6 +56,8 @@ def add_args(run_command, args):
         run_command += ['-C', str(args.curveid)]
     if args.command:
         run_command += ['-c', args.command]
+    if args.input:
+        run_command += ['-i', args.input]
 
 
 def zip(outdir):
@@ -961,6 +963,7 @@ def main():
     parser.add_argument('-C', '--curveid', type=lambda x: int(x, 0), required=False)
     parser.add_argument('-c', '--command', type=str, required=False)
     parser.add_argument('-o', '--outdir', type=str, required=False, default='out')
+    parser.add_argument('-i', '--input', type=str, required=False, default='static', choices=['static', 'random', 'file'])
     parser.add_argument('--with-image-tag', type=str, required=False, default=IMAGE_TAG)
     parser.add_argument('--disable-anonymize', action='store_true', default=False)
     parser.add_argument('--only-measure', action='store_true', default=False)
