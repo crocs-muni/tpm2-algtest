@@ -105,6 +105,12 @@ void output_results(
     case TPM2_CC_ZGen_2Phase:
         snprintf(filename, 256, "Perf_ZGen:0x%04x_0x%04x.csv", scenario->zgen.key_params.parameters.eccDetail.curveID, scenario->zgen.scheme);
         break;
+    case TPM2_CC_ECDH_KeyGen:
+        snprintf(filename, 256, "Perf_ECDH_KeyGen:0x%04x.csv", scenario->ecdh.key_params.parameters.eccDetail.curveID);
+        break;
+    case TPM2_CC_ECDH_ZGen:
+        snprintf(filename, 256, "Perf_ECDH_ZGen:0x%04x.csv", scenario->ecdh.key_params.parameters.eccDetail.curveID);
+        break;
     default:
         log_error("Perf: (output_results) Command not supported.");
         return;
@@ -714,6 +720,7 @@ bool run_perf_zgen(
     TPM2B_PUBLIC inPublic = prepare_template(&scenario->zgen.key_params);
     // Key needs DECRYPT attribute for ZGEN
     inPublic.publicArea.objectAttributes |= TPMA_OBJECT_DECRYPT;
+    inPublic.publicArea.objectAttributes &= ~TPMA_OBJECT_SIGN_ENCRYPT;
 
     TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
     if (rc != TPM2_RC_SUCCESS) {
@@ -782,6 +789,150 @@ bool run_perf_zgen(
     return true;
 }
 
+bool run_perf_ecdh_keygen(
+        TSS2_SYS_CONTEXT *sapi_context,
+        const struct perf_scenario *scenario,
+        TPMI_DH_OBJECT primary_handle,
+        struct perf_result *result,
+        struct progress *prog)
+{
+    TPM2B_PUBLIC inPublic = prepare_template(&scenario->ecdh.key_params);
+    // Key needs DECRYPT attribute for ECDH
+    inPublic.publicArea.objectAttributes |= TPMA_OBJECT_DECRYPT;
+    inPublic.publicArea.objectAttributes &= ~TPMA_OBJECT_SIGN_ENCRYPT;
+
+    TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
+    if (rc != TPM2_RC_SUCCESS) {
+        return false;
+    }
+
+    TPM2_HANDLE object_handle;
+    log_info("Perf ecdh_keygen: Generating loaded key...");
+    rc = create_loaded(sapi_context, &inPublic, primary_handle, &object_handle);
+    if (rc != TPM2_RC_SUCCESS) {
+        log_error("Perf ecdh_keygen: Error when creating loaded key %04x", rc);
+        skip_progress(prog, scenario->parameters.repetitions);
+        Tss2_Sys_FlushContext(sapi_context, object_handle);
+        return false;
+    }
+
+    int failures = 0;
+    result->size = 0;
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    for (unsigned i = 0; i < scenario->parameters.repetitions; ++i) {
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        if (get_duration_s(&start, &end) > scenario->parameters.max_duration_s) {
+            log_error("Perf ecdh_keygen: Max duration reached. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i);
+            break;
+        }
+
+        result->data_points[i].rc = ecdh_keygen(sapi_context, object_handle, NULL, NULL, &result->data_points[i].duration_s);
+        log_info("Perf ecdh_keygen %d: curve %04x | duration %.9f | rc %04x",
+                    i, scenario->ecdh.key_params.parameters.eccDetail.curveID,
+                    result->data_points[i].duration_s, result->data_points[i].rc);
+
+        if (result->data_points[i].rc != TPM2_RC_SUCCESS) {
+            ++failures;
+        }
+
+        ++result->size;
+
+        printf("%lu%%\n", increase_progress(prog));
+        if(failures >= FAILURE_LIMIT) {
+            log_error("Perf ecdh_keygen: Too many failures. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i - 1);
+            Tss2_Sys_FlushContext(sapi_context, object_handle);
+            return false;
+        }
+    }
+
+    Tss2_Sys_FlushContext(sapi_context, object_handle);
+    return true;
+}
+
+bool run_perf_ecdh_zgen(
+        TSS2_SYS_CONTEXT *sapi_context,
+        const struct perf_scenario *scenario,
+        TPMI_DH_OBJECT primary_handle,
+        struct perf_result *result,
+        struct progress *prog)
+{
+    TPM2B_PUBLIC inPublic = prepare_template(&scenario->ecdh.key_params);
+    // Key needs DECRYPT attribute for ECDH
+    inPublic.publicArea.objectAttributes |= TPMA_OBJECT_DECRYPT;
+    inPublic.publicArea.objectAttributes &= ~TPMA_OBJECT_SIGN_ENCRYPT;
+
+    TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
+    if (rc != TPM2_RC_SUCCESS) {
+        return false;
+    }
+
+    log_info("Perf ecdh_zgen: Generating loaded key...");
+    TPM2B_PUBLIC outPublic = { .size = 0 };
+    TPM2B_PRIVATE outPrivate = { .size = 0 };
+    rc = create(sapi_context, &inPublic, primary_handle, &outPublic, &outPrivate, NULL);
+    if (rc != TPM2_RC_SUCCESS) {
+        log_error("Perf ecdh_zgen: Error when creating key %04x", rc);
+        skip_progress(prog, scenario->parameters.repetitions);
+        return false;
+    }
+    TPM2_HANDLE object_handle;
+    rc = load(sapi_context, primary_handle, &outPrivate, &outPublic, &object_handle);
+    if (rc != TPM2_RC_SUCCESS) {
+        log_error("Perf ecdh_zgen: Error when loading key %04x", rc);
+        skip_progress(prog, scenario->parameters.repetitions);
+        Tss2_Sys_FlushContext(sapi_context, object_handle);
+        return false;
+    }
+
+    int failures = 0;
+    result->size = 0;
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    for (unsigned i = 0; i < scenario->parameters.repetitions; ++i) {
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        if (get_duration_s(&start, &end) > scenario->parameters.max_duration_s) {
+            log_error("Perf ecdh_zgen: Max duration reached. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i);
+            break;
+        }
+
+        TPM2B_ECC_POINT inPublic = {
+            .size = outPublic.publicArea.unique.ecc.x.size + outPublic.publicArea.unique.ecc.y.size
+        };
+        inPublic.point.x.size = outPublic.publicArea.unique.ecc.x.size;
+        memcpy(inPublic.point.x.buffer, outPublic.publicArea.unique.ecc.x.buffer, outPublic.publicArea.unique.ecc.x.size);
+        inPublic.point.y.size = outPublic.publicArea.unique.ecc.y.size;
+        memcpy(inPublic.point.y.buffer, outPublic.publicArea.unique.ecc.y.buffer, outPublic.publicArea.unique.ecc.y.size);
+
+        result->data_points[i].rc = ecdh_zgen(sapi_context, object_handle, &inPublic, NULL, &result->data_points[i].duration_s);
+        log_info("Perf ecdh_zgen %d: curve %04x | duration %.9f | rc %04x",
+                    i, scenario->ecdh.key_params.parameters.eccDetail.curveID,
+                    result->data_points[i].duration_s, result->data_points[i].rc);
+
+        if (result->data_points[i].rc != TPM2_RC_SUCCESS) {
+            ++failures;
+        }
+
+        ++result->size;
+
+        printf("%lu%%\n", increase_progress(prog));
+        if(failures >= FAILURE_LIMIT) {
+            log_error("Perf ecdh_keygen: Too many failures. Skipping remaining iterations.");
+            skip_progress(prog, scenario->parameters.repetitions - i - 1);
+            Tss2_Sys_FlushContext(sapi_context, object_handle);
+            return false;
+        }
+    }
+
+    Tss2_Sys_FlushContext(sapi_context, object_handle);
+    return true;
+}
+
 void run_perf_on_primary(
         TSS2_SYS_CONTEXT *sapi_context,
         const struct perf_scenario *scenario,
@@ -816,6 +967,12 @@ void run_perf_on_primary(
         break;
     case TPM2_CC_ZGen_2Phase:
         ok = run_perf_zgen(sapi_context, scenario, primary_handle, &result, prog);
+        break;
+    case TPM2_CC_ECDH_KeyGen:
+        ok = run_perf_ecdh_keygen(sapi_context, scenario, primary_handle, &result, prog);
+        break;
+    case TPM2_CC_ECDH_ZGen:
+        ok = run_perf_ecdh_zgen(sapi_context, scenario, primary_handle, &result, prog);
         break;
     default:
         log_warning("Perf: unsupported command code %04x", scenario->command_code);
@@ -1150,6 +1307,46 @@ unsigned long count_supported_perf_scenarios(
         }
     }
 
+    if (command_in_options("ecdh")) {
+        scenario.command_code = TPM2_CC_ECDH_KeyGen;
+        scenario.ecdh = (struct perf_ecdh_scenario) {
+                .key_params = {
+                        .type = TPM2_ALG_ECC,
+                        .parameters.eccDetail = {
+                                .curveID = TPM2_ECC_NONE,
+                                .scheme = {
+                                    .scheme = TPM2_ALG_ECDH,
+                                    .details = { .ecdh = { .hashAlg = TPM2_ALG_SHA256 } },
+                                },
+                                .kdf.scheme = TPM2_ALG_NULL,
+                                .symmetric.algorithm = TPM2_ALG_NULL,
+                        },
+                },
+        };
+        while (get_next_ecc_curve(&scenario.ecdh.key_params.parameters.eccDetail.curveID)) {
+            TPM2B_PUBLIC inPublic = prepare_template(&scenario.ecdh.key_params);
+            inPublic.publicArea.objectAttributes |= TPMA_OBJECT_DECRYPT;
+            inPublic.publicArea.objectAttributes &= ~TPMA_OBJECT_SIGN_ENCRYPT;
+
+            TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
+            if (rc == TPM2_RC_SUCCESS) {
+                total += scenario.parameters.repetitions;
+            }
+        }
+        scenario.command_code = TPM2_CC_ECDH_ZGen;
+        scenario.ecdh.key_params.parameters.eccDetail.curveID = TPM2_ECC_NONE;
+        while (get_next_ecc_curve(&scenario.ecdh.key_params.parameters.eccDetail.curveID)) {
+            TPM2B_PUBLIC inPublic = prepare_template(&scenario.ecdh.key_params);
+            inPublic.publicArea.objectAttributes |= TPMA_OBJECT_DECRYPT;
+            inPublic.publicArea.objectAttributes &= ~TPMA_OBJECT_SIGN_ENCRYPT;
+
+            TPM2_RC rc = test_parms(sapi_context, &inPublic.publicArea);
+            if (rc == TPM2_RC_SUCCESS) {
+                total += scenario.parameters.repetitions;
+            }
+        }
+    }
+
     return total;
 }
 
@@ -1306,6 +1503,32 @@ void run_perf_scenarios(
                 run_perf_on_primary(sapi_context, &scenario, primary_handle, &prog);
             }
             scenario.zgen.scheme = TPM2_ALG_NULL;
+        }
+    }
+
+    if (command_in_options("ecdh")) {
+        scenario.command_code = TPM2_CC_ECDH_KeyGen;
+        scenario.ecdh = (struct perf_ecdh_scenario) {
+                .key_params = {
+                        .type = TPM2_ALG_ECC,
+                        .parameters.eccDetail = {
+                                .curveID = TPM2_ECC_NONE,
+                                .scheme = {
+                                    .scheme = TPM2_ALG_ECDH,
+                                    .details = { .ecdh = { .hashAlg = TPM2_ALG_SHA256 } },
+                                },
+                                .kdf.scheme = TPM2_ALG_NULL,
+                                .symmetric.algorithm = TPM2_ALG_NULL,
+                        },
+                },
+        };
+        while (get_next_ecc_curve(&scenario.ecdh.key_params.parameters.eccDetail.curveID)) {
+            run_perf_on_primary(sapi_context, &scenario, primary_handle, &prog);
+        }
+        scenario.command_code = TPM2_CC_ECDH_ZGen;
+        scenario.ecdh.key_params.parameters.eccDetail.curveID = TPM2_ECC_NONE;
+        while (get_next_ecc_curve(&scenario.ecdh.key_params.parameters.eccDetail.curveID)) {
+            run_perf_on_primary(sapi_context, &scenario, primary_handle, &prog);
         }
     }
 

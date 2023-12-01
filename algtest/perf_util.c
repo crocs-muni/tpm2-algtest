@@ -334,3 +334,68 @@ TPM2_RC zgen_2phase(
     }
     return rc;
 }
+
+TPM2_RC ecdh_keygen(
+        TSS2_SYS_CONTEXT *sapi_context,
+        TPMI_DH_OBJECT keyHandle,
+        TPM2B_ECC_POINT *outZ,
+        TPM2B_ECC_POINT *outPub,
+        double *duration)
+{
+    /* Rsp parameters */
+    TSS2L_SYS_AUTH_RESPONSE rspAuthsArray;
+
+    TPM2B_ECC_POINT localZ = { .size = 0 };
+    if(outZ == NULL) {
+        outZ = &localZ;
+    }
+    TPM2B_ECC_POINT localPub = { .size = 0 };
+    if(outPub == NULL) {
+        outPub = &localPub;
+    }
+
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    TPM2_RC rc = Tss2_Sys_ECDH_KeyGen(sapi_context, keyHandle, NULL,
+                                      outZ, outPub, &rspAuthsArray);
+
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    if (duration != NULL) {
+        *duration = get_duration_s(&start, &end);
+    }
+    return rc;
+}
+
+TPM2_RC ecdh_zgen(
+        TSS2_SYS_CONTEXT *sapi_context,
+        TPMI_DH_OBJECT keyHandle,
+        TPM2B_ECC_POINT *in,
+        TPM2B_ECC_POINT *out,
+        double *duration)
+{
+    /* Cmd parameters */
+    TSS2L_SYS_AUTH_COMMAND cmdAuthsArray = prepare_session();
+
+    /* Rsp parameters */
+    TSS2L_SYS_AUTH_RESPONSE rspAuthsArray;
+
+    TPM2B_ECC_POINT localZ = { .size = 0 };
+    TPM2B_ECC_POINT localOut = { .size = 0 };
+    if(out == NULL) {
+        out = &localOut;
+    }
+
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    TPM2_RC rc = Tss2_Sys_ECDH_ZGen(sapi_context, keyHandle, &cmdAuthsArray,
+                                    in,
+                                    out, &rspAuthsArray);
+
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    if (duration != NULL) {
+        *duration = get_duration_s(&start, &end);
+    }
+    return rc;
+}

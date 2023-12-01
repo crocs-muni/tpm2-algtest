@@ -78,3 +78,17 @@ TPM2_RC zgen_2phase(
         TPM2B_ECC_POINT *outZ1,
         TPM2B_ECC_POINT *outZ2,
         double *duration);
+
+TPM2_RC ecdh_keygen(
+        TSS2_SYS_CONTEXT *sapi_context,
+        TPMI_DH_OBJECT keyHandle,
+        TPM2B_ECC_POINT *outZ,
+        TPM2B_ECC_POINT *outPub,
+        double *duration);
+
+TPM2_RC ecdh_zgen(
+        TSS2_SYS_CONTEXT *sapi_context,
+        TPMI_DH_OBJECT keyHandle,
+        TPM2B_ECC_POINT *in,
+        TPM2B_ECC_POINT *out,
+        double *duration);

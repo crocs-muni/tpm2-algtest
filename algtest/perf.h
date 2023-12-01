@@ -42,6 +42,11 @@ struct perf_zgen_scenario {
     TPMI_ECC_KEY_EXCHANGE scheme;
 };
 
+struct perf_ecdh_scenario {
+    TPMT_PUBLIC_PARMS key_params;
+    TPM2B_ECC_POINT in_point;
+};
+
 struct perf_scenario {
     struct scenario_parameters parameters;
     TPM2_CC command_code;
@@ -53,6 +58,7 @@ struct perf_scenario {
         struct perf_encryptdecrypt_scenario encryptdecrypt;
         struct perf_hash_scenario hash;
         struct perf_zgen_scenario zgen;
+        struct perf_ecdh_scenario ecdh;
     };
 };
 
