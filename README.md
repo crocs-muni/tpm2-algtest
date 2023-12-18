@@ -33,6 +33,13 @@ $ python run_algtest.py all
 
 **Important:** If during keygen test you don't see lines ending with `rc 0000`, but see some other number (return code), the key generation fails and it doesn't make sense to continue. Please contact me and send me the `out.zip` file anyway, the logs and TPM info there will still help us. A few erroneous return codes are ok.
 
+### Running the tool with Nix(OS)
+
+On NixOS, update your `/etc/nixos/configuration.nix` according to the [TPM instructions](https://nixos.wiki/wiki/TPM) and rebuild your environment. To enter a development shell, use `nix develop`. Then you can build the `tpm2-algtest` using the previously mentioned build instructions. Python's virtual environment is set up automatically, therefore, run the tests after the build with:
+```sh
+$ python run_algtest.py all
+```
+
 ### Troubleshooting
 If the script crashes with this message:
 ```
