@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: BSD-2-Clause */
 #pragma once
 #include <tss2/tss2_sys.h>
 #include <stdbool.h>

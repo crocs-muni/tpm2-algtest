@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: BSD-2-Clause */
 #define FAILURE_LIMIT 3
 
 struct progress {

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: BSD-2-Clause */
 #include "status.h"
 
 unsigned long get_progress_percentage(struct progress *prog) {

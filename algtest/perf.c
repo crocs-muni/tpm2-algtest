@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: BSD-2-Clause */
 #include "perf.h"
 #include "object_util.h"
 #include "logging.h"

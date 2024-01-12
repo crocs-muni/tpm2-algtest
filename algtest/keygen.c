@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: BSD-2-Clause */
 #include "keygen.h"
 #include "options.h"
 #include "logging.h"
