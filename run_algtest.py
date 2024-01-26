@@ -343,10 +343,7 @@ def certs_handler(args):
         subprocess.run(['rm', '-f', 'ek-rsa.cer', 'ek-ecc.cer'], stdout=logfile, stderr=logfile)
 
         print("Getting persistent handles", file=logfile)
-        try:
-            process = subprocess.run(['tpm2_getcap', '-T', args.with_tctii, '-c', 'handles-persistent'], capture_output=True).check_returncode()
-        except:
-            process = subprocess.run(['tpm2_getcap', '-T', args.with_tctii, 'handles-persistent'], capture_output=True)
+        process = subprocess.run(['tpm2_getcap', '-T', args.with_tctii, 'handles-persistent'], capture_output=True)
 
         print(process.stderr.decode(), file=logfile)
         for handle in map(lambda x: x[2:], process.stdout.decode("utf-8").strip().split("\n")):
@@ -382,10 +379,7 @@ def capability_handler(args):
         for command in ("algorithms", "commands", "properties-fixed", "properties-variable", "ecc-curves", "handles-persistent"):
             print(f"Running tpm2_getcap {command}", file=logfile)
             with open(os.path.join(detail_dir, f"Capability_{command}.txt"), 'w') as outfile:
-                try:
-                    subprocess.run(run_command + ["-c", command], stdout=outfile, stderr=logfile).check_returncode()
-                except:
-                    subprocess.run(run_command + [command], stdout=outfile, stderr=logfile)
+                subprocess.run(run_command + [command], stdout=outfile, stderr=logfile)
 
 
 def keygen_handler(args):
@@ -561,13 +555,7 @@ def write_results_file(results_file, detail_dir):
         with open(properties_path, 'r') as infile:
             properties = ""
             for line in infile:
-                if line.startswith('  as UINT32:'):
-                    continue
-                if line.startswith('  as string:'):
-                    line = line[line.find('"'):]
-                    properties = properties[:-1] + '\t' + line
-                else:
-                    properties += "  " + line
+                properties += "  " + line
             results_file.write(remove_control_chars(properties))
 
     algorithms_path = os.path.join(detail_dir, 'Capability_algorithms.txt')
