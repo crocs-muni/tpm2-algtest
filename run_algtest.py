@@ -21,13 +21,6 @@ DEVICE = '/dev/tpm0'
 IMAGE_TAG = 'v2.5'
 
 
-def get_algtest(args):
-    if args.use_system_algtest:
-        return 'tpm2_algtest'
-    else:
-        return 'build/tpm2_algtest'
-
-
 def set_status(args, status):
     if args.machine_readable_statuses:
         status = f"+++{status}+++"
@@ -397,7 +390,7 @@ def capability_handler(args):
 
 def keygen_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
-    run_command = [get_algtest(args), '--outdir=' + detail_dir, '-T', args.with_tctii, '-s', 'keygen']
+    run_command = [args.algtest_binary, '--outdir=' + detail_dir, '-T', args.with_tctii, '-s', 'keygen']
     add_args(run_command, args)
 
     with open(os.path.join(detail_dir, 'keygen_log.txt'), 'w') as logfile:
@@ -406,7 +399,7 @@ def keygen_handler(args):
 
 def perf_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
-    run_command = [get_algtest(args), '--outdir=' + detail_dir, '-T', args.with_tctii, '-s', 'perf']
+    run_command = [args.algtest_binary, '--outdir=' + detail_dir, '-T', args.with_tctii, '-s', 'perf']
     add_args(run_command, args)
 
     with open(os.path.join(detail_dir, 'perf_log.txt'), 'w') as logfile:
@@ -415,7 +408,7 @@ def perf_handler(args):
 
 def cryptoops_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
-    run_command = [get_algtest(args), '--outdir=' + detail_dir, '-T', args.with_tctii, '-s', 'cryptoops']
+    run_command = [args.algtest_binary, '--outdir=' + detail_dir, '-T', args.with_tctii, '-s', 'cryptoops']
     add_args(run_command, args)
 
     with open(os.path.join(detail_dir, 'cryptoops_log.txt'), 'w') as logfile:
@@ -429,7 +422,7 @@ def cryptoops_handler(args):
 
 def rng_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
-    run_command = [get_algtest(args), '--outdir=' + detail_dir, '-T', args.with_tctii, '-s', 'rng']
+    run_command = [args.algtest_binary, '--outdir=' + detail_dir, '-T', args.with_tctii, '-s', 'rng']
     add_args(run_command, args)
 
     with open(os.path.join(detail_dir, 'rng_log.txt'), 'w') as logfile:
@@ -677,6 +670,7 @@ def main():
     parser.add_argument('-c', '--command', type=str, required=False)
     parser.add_argument('-o', '--outdir', type=str, required=False, default='algtest_output')
     parser.add_argument('-i', '--input', type=str, required=False, default='static', choices=['static', 'random', 'file'])
+    parser.add_argument('--algtest-binary', type=str, required=False, default='build/tpm2_algtest')
     parser.add_argument('--with-image-tag', type=str, required=False, default=IMAGE_TAG)
     parser.add_argument('--disable-anonymize', action='store_true', default=False)
     parser.add_argument('--machine-readable-statuses', action='store_true', default=False)
