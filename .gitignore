@@ -1,2 +1,4 @@
 __pycache__
-
+build/
+algtest_output/
+algtest_output.zip
