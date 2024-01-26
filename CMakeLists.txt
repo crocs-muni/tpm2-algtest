@@ -1,5 +1,5 @@
-project(tpm2-algtest C)
 cmake_minimum_required(VERSION 3.10)
+project(tpm2-algtest C)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -D_GNU_SOURCE -DOPENSSL_SUPPRESS_DEPRECATED")
 
