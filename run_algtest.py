@@ -241,7 +241,7 @@ def anonymize_blocks(data, blocks=[]):
 
 
 def get_cert(cert_path, logfile=sys.stderr, anonymize=True):
-    process = subprocess.run(['sudo', 'openssl', 'x509', '-in', cert_path, '-noout', '-text'], capture_output=True)
+    process = subprocess.run(['openssl', 'x509', '-in', cert_path, '-noout', '-text'], capture_output=True)
     print(process.stderr.decode(), file=logfile)
     process.check_returncode()
     data = process.stdout.decode().split("\n")
@@ -255,7 +255,7 @@ def get_cert(cert_path, logfile=sys.stderr, anonymize=True):
 
 
 def get_key(key_path, logfile=sys.stderr, anonymize=True):
-    process = subprocess.run(['sudo', 'openssl', 'pkey', '-pubin', '-in', key_path, '-noout', '-text'], capture_output=True)
+    process = subprocess.run(['openssl', 'pkey', '-pubin', '-in', key_path, '-noout', '-text'], capture_output=True)
     print(process.stderr.decode(), file=logfile)
     process.check_returncode()
     data = process.stdout.decode().split("\n")
@@ -270,7 +270,7 @@ def get_key(key_path, logfile=sys.stderr, anonymize=True):
 
 def get_anonymized_key(path, logfile=sys.stderr, cert=True):
     if cert:
-        process = subprocess.run(['sudo', 'openssl', 'x509', '-in', path, '-noout', '-pubkey'], capture_output=True)
+        process = subprocess.run(['openssl', 'x509', '-in', path, '-noout', '-pubkey'], capture_output=True)
         print(process.stderr.decode(), file=logfile)
         process.check_returncode()
         data = process.stdout
@@ -295,10 +295,10 @@ def system_info(args, detail_dir):
         print("Version tag:", args.with_image_tag)
 
     try:
-        result = subprocess.run("sudo -n dmidecode -s bios-version", stdout=subprocess.PIPE, shell=True)
+        result = subprocess.run("dmidecode -s bios-version", stdout=subprocess.PIPE, shell=True)
         with open(os.path.join(detail_dir, 'dmidecode_bios_version.txt'), 'w') as outfile:
             outfile.write(result.stdout.decode("ascii"))
-        result = subprocess.run("sudo dmidecode -t system | grep -Ei '^\\s*(manufacturer|product name|version):'", stdout=subprocess.PIPE, shell=True)
+        result = subprocess.run("dmidecode -t system | grep -Ei '^\\s*(manufacturer|product name|version):'", stdout=subprocess.PIPE, shell=True)
         with open(os.path.join(detail_dir, 'dmidecode_system_info.txt'), 'w') as outfile:
             outfile.write(result.stdout.decode("ascii"))
         result = subprocess.run("uname -a", stdout=subprocess.PIPE, shell=True)
@@ -313,7 +313,7 @@ def certs_handler(args):
 
     with open(os.path.join(detail_dir, "certs_log.txt"), "w") as logfile:
         print("Running tpm2_getekcertificate", file=logfile)
-        subprocess.run(['sudo', 'tpm2_getekcertificate', '-T', args.with_tctii, '-o', 'ek-rsa.cer', '-o', 'ek-ecc.cer'], stdout=logfile, stderr=logfile)
+        subprocess.run(['tpm2_getekcertificate', '-T', args.with_tctii, '-o', 'ek-rsa.cer', '-o', 'ek-ecc.cer'], stdout=logfile, stderr=logfile)
         try:
             print(f"Getting {'anonymized ' if not args.disable_anonymize else ''}RSA endorsement certificate", file=logfile)
 
@@ -347,13 +347,13 @@ def certs_handler(args):
             print(e, file=logfile)
 
         print("Removing output certificates", file=logfile)
-        subprocess.run(['sudo', 'rm', '-f', 'ek-rsa.cer', 'ek-ecc.cer'], stdout=logfile, stderr=logfile)
+        subprocess.run(['rm', '-f', 'ek-rsa.cer', 'ek-ecc.cer'], stdout=logfile, stderr=logfile)
 
         print("Getting persistent handles", file=logfile)
         try:
-            process = subprocess.run(['sudo', 'tpm2_getcap', '-T', args.with_tctii, '-c', 'handles-persistent'], capture_output=True).check_returncode()
+            process = subprocess.run(['tpm2_getcap', '-T', args.with_tctii, '-c', 'handles-persistent'], capture_output=True).check_returncode()
         except:
-            process = subprocess.run(['sudo', 'tpm2_getcap', '-T', args.with_tctii, 'handles-persistent'], capture_output=True)
+            process = subprocess.run(['tpm2_getcap', '-T', args.with_tctii, 'handles-persistent'], capture_output=True)
 
         print(process.stderr.decode(), file=logfile)
         for handle in map(lambda x: x[2:], process.stdout.decode("utf-8").strip().split("\n")):
@@ -374,17 +374,17 @@ def certs_handler(args):
                 print(f"Could not obtain handle {handle}", file=logfile)
                 print(e, file=logfile)
 
-            subprocess.run(['sudo', 'rm', '-f', key_path], stdout=logfile, stderr=logfile)
+            subprocess.run(['rm', '-f', key_path], stdout=logfile, stderr=logfile)
 
 
 def capability_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
-    run_command = ['sudo', 'tpm2_getcap', '-T', args.with_tctii]
+    run_command = ['tpm2_getcap', '-T', args.with_tctii]
 
     with open(os.path.join(detail_dir, "capability_log.txt"), "w") as logfile:
         print("Running tpm2_pcrread", file=logfile)
         with open(os.path.join(detail_dir, "Capability_pcrread.txt"), 'w') as outfile:
-            subprocess.run(['sudo', 'tpm2_pcrread', '-T', args.with_tctii], stdout=outfile, stderr=logfile)
+            subprocess.run(['tpm2_pcrread', '-T', args.with_tctii], stdout=outfile, stderr=logfile)
 
         for command in ("algorithms", "commands", "properties-fixed", "properties-variable", "ecc-curves", "handles-persistent"):
             print(f"Running tpm2_getcap {command}", file=logfile)
@@ -397,7 +397,7 @@ def capability_handler(args):
 
 def keygen_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
-    run_command = ['sudo', get_algtest(args), '--outdir=' + detail_dir, '-T', args.with_tctii, '-s', 'keygen']
+    run_command = [get_algtest(args), '--outdir=' + detail_dir, '-T', args.with_tctii, '-s', 'keygen']
     add_args(run_command, args)
 
     with open(os.path.join(detail_dir, 'keygen_log.txt'), 'w') as logfile:
@@ -406,7 +406,7 @@ def keygen_handler(args):
 
 def perf_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
-    run_command = ['sudo', get_algtest(args), '--outdir=' + detail_dir, '-T', args.with_tctii, '-s', 'perf']
+    run_command = [get_algtest(args), '--outdir=' + detail_dir, '-T', args.with_tctii, '-s', 'perf']
     add_args(run_command, args)
 
     with open(os.path.join(detail_dir, 'perf_log.txt'), 'w') as logfile:
@@ -415,7 +415,7 @@ def perf_handler(args):
 
 def cryptoops_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
-    run_command = ['sudo', get_algtest(args), '--outdir=' + detail_dir, '-T', args.with_tctii, '-s', 'cryptoops']
+    run_command = [get_algtest(args), '--outdir=' + detail_dir, '-T', args.with_tctii, '-s', 'cryptoops']
     add_args(run_command, args)
 
     with open(os.path.join(detail_dir, 'cryptoops_log.txt'), 'w') as logfile:
@@ -429,7 +429,7 @@ def cryptoops_handler(args):
 
 def rng_handler(args):
     detail_dir = os.path.join(args.outdir, 'detail')
-    run_command = ['sudo', get_algtest(args), '--outdir=' + detail_dir, '-T', args.with_tctii, '-s', 'rng']
+    run_command = [get_algtest(args), '--outdir=' + detail_dir, '-T', args.with_tctii, '-s', 'rng']
     add_args(run_command, args)
 
     with open(os.path.join(detail_dir, 'rng_log.txt'), 'w') as logfile:
@@ -675,14 +675,20 @@ def main():
     parser.add_argument('-l', '--keylen', type=int, required=False)
     parser.add_argument('-C', '--curveid', type=lambda x: int(x, 0), required=False)
     parser.add_argument('-c', '--command', type=str, required=False)
-    parser.add_argument('-o', '--outdir', type=str, required=False, default='out')
+    parser.add_argument('-o', '--outdir', type=str, required=False, default='algtest_output')
     parser.add_argument('-i', '--input', type=str, required=False, default='static', choices=['static', 'random', 'file'])
     parser.add_argument('--with-image-tag', type=str, required=False, default=IMAGE_TAG)
     parser.add_argument('--disable-anonymize', action='store_true', default=False)
     parser.add_argument('--machine-readable-statuses', action='store_true', default=False)
     parser.add_argument('--use-system-algtest', action='store_true', default=False)
     parser.add_argument('--with-tctii', type=str, required=False, default="device")
+    parser.add_argument('--no-root', action='store_true', default=False)
     args = parser.parse_args()
+
+    if os.geteuid() != 0:
+        print("ERROR: The script is not running as root.")
+        if not args.no_root:
+            sys.exit(1)
 
     if not os.path.exists(DEVICE):
         print(f'Device {DEVICE} not found')

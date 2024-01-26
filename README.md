@@ -31,7 +31,7 @@ $ pip install -r requirements.txt
 
 Run `run_algtest.py`:
 ```sh
-$ python run_algtest.py all
+$ sudo python run_algtest.py all
 ```
 
 **Important:** Please DO NOT suspend or hibernate the computer while running the algtest, it will affect the results! Locking the screen is ok.
