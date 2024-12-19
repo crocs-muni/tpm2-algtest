@@ -1,6 +1,22 @@
 # TPM2-AlgTest
 
-It has been found out that implementation specifics of cryptographic smart cards can lead to serious vulnerabilities [[1](https://en.wikipedia.org/wiki/ROCA_vulnerability)]. Since TPM chips are often manufactured by the same vendors, we have decided to create a tool that would help with collection of data from various TPMs that could be used for further analysis and discovery of similar bugs.
+The cryptographic hardware, including the security certified ones (Common Criteria, FIPS 140), was shown to contain serious vulnerabilities like [[1](https://en.wikipedia.org/wiki/ROCA_vulnerability)], [[2](https://minerva.crocs.fi.muni.cz/)] or [[3](https://tpm.fail)]. Since TPM chips are often manufactured by the same vendors as cryptographic smartcards, TPM2-AlgTest collects data from various TPMs that could be used for further analysis and discovery of similar bugs. The results from almost 80 TPM firmware revisions from 6 TPM vendors were published at [CHES'24](https://ches.iacr.org/2024/) conference with existing and new vulnerabilities found in several of them. 
+
+If you like the tool, please consider citing our paper:
+```
+@inproceedings{2024-ches-tpmscan,
+   title = {TPMScan: A wide-scale study of security-relevant properties of TPM 2.0 chips},
+   year = {2024},
+   author = {Svenda, Petr and Dufka, Antonin and Broz, Milan and Lacko, Roman and Jaros, Tomas and Zatovic, Daniel and Pospisil, Josef},
+   booktitle = {IACR Transactions on Cryptographic Hardware and Embedded Systems},
+   keywords = {TPM, common criteria, fips140, RSA, ECDSA},
+   issn = {ISSN 2569-2925},
+   pages = {714–734},
+   volume={2024, No. 2}, 
+   url={https://tches.iacr.org/index.php/TCHES/article/view/11444}, 
+   DOI={10.46586/tches.v2024.i2.714-734}
+}
+```
 
 This project uses sources from the [tpm2-tools](https://github.com/tpm2-software/tpm2-tools) project.
 
