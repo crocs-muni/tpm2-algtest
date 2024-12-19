@@ -1,6 +1,9 @@
 # TPM2-AlgTest
 
-The cryptographic hardware, including the security certified ones (Common Criteria, FIPS 140), was shown to contain serious vulnerabilities like [[1](https://en.wikipedia.org/wiki/ROCA_vulnerability)], [[2](https://minerva.crocs.fi.muni.cz/)] or [[3](https://tpm.fail)]. Since TPM chips are often manufactured by the same vendors as cryptographic smartcards, TPM2-AlgTest collects data from various TPMs that could be used for further analysis and discovery of similar bugs. The results from almost 80 TPM firmware revisions from 6 TPM vendors were published at [CHES'24](https://ches.iacr.org/2024/) conference with existing and new vulnerabilities found in several of them. 
+The cryptographic hardware, including the security-certified one (Common Criteria, FIPS 140), was shown to contain serious vulnerabilities like [[1](https://en.wikipedia.org/wiki/ROCA_vulnerability)], [[2](https://minerva.crocs.fi.muni.cz/)] or [[3](https://tpm.fail)]. Since TPM chips are often manufactured by the same vendors as cryptographic smartcards, TPM2-AlgTest collects data from various TPMs that could be used for further analysis and discovery of similar bugs. The results from almost 80 TPM firmware revisions from 6 TPM vendors were published at [CHES'24](https://ches.iacr.org/2024/) conference, and existing and new vulnerabilities were found in several of them. 
+
+![image](https://github.com/user-attachments/assets/d2930dc1-8964-41f1-b15c-597f703bad11)
+
 
 If you like the tool, please consider citing our paper:
 ```
